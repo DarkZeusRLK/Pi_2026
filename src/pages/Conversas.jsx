@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Check, CheckCheck, MessageCircle, Send } from 'lucide-react'
 import { hora, tempoRelativo, useStore } from '../store'
 import { api, useApi } from '../api'
+import Avatar from '../components/Avatar'
 import { Badge, Carregando, Contador, ErroCarga, Esqueleto, Thumb, Vazio } from '../components/ui'
 
 function ListaConversas({ ativa, lista }) {
@@ -23,7 +24,10 @@ function ListaConversas({ ativa, lista }) {
         return (
           <li key={c.id}>
             <Link to={`/conversas/${c.id}`} className={`conv ${ativa === c.id ? 'is-on' : ''} ${nl ? 'is-unread' : ''}`}>
-              <Thumb item={{ ...c.item, capa: c.item.capa }} />
+              <span className="conv-avatar">
+                <Thumb item={{ ...c.item, capa: c.item.capa }} />
+                <Avatar usuario={c.outro} tamanho={28} className="conv-avatar-outro" />
+              </span>
               <div className="conv-body">
                 <div className="conv-top">
                   <b>{c.item.titulo}</b>
@@ -94,7 +98,7 @@ export function Chat() {
       <>
         <header className="chat-head">
           <button className="icon-btn show-mobile" onClick={() => nav('/conversas')} aria-label="Voltar para conversas"><ArrowLeft size={20} /></button>
-          {item && <Thumb item={item} />}
+          <Avatar usuario={outro} tamanho={40} />
           <div className="chat-head-txt">
             {item ? <Link to={`/item/${item.id}`}><b>{item.titulo}</b></Link> : <b>Item removido</b>}
             <small>{outro?.nome}{item && <> · <Badge>{item.status}</Badge></>}</small>

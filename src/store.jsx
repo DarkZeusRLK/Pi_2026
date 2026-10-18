@@ -10,6 +10,7 @@ export function StoreProvider({ children }) {
   const [carregandoSessao, setCarregandoSessao] = useState(true)
   const [naoLidas, setNaoLidas] = useState(0)
   const [toasts, setToasts] = useState([])
+  const [config, setConfig] = useState({ upload: false, tempoReal: false, carregada: false })
   const timers = useRef({})
 
   const toast = useCallback((msg, opts = {}) => {
@@ -25,6 +26,10 @@ export function StoreProvider({ children }) {
 
   useEffect(() => {
     api('/auth/me').then((d) => setUser(d.usuario)).catch(() => {}).finally(() => setCarregandoSessao(false))
+  }, [])
+
+  useEffect(() => {
+    api('/config').then((c) => setConfig({ ...c, carregada: true })).catch(() => setConfig((x) => ({ ...x, carregada: true })))
   }, [])
 
   const atualizarNaoLidas = useCallback(() => {
@@ -46,7 +51,7 @@ export function StoreProvider({ children }) {
 
   const value = {
     user, setUser, carregandoSessao, isAdmin: user?.perfil === 'admin', sair,
-    naoLidas, atualizarNaoLidas, toast, toastErro, toasts, fecharToast,
+    config, naoLidas, atualizarNaoLidas, toast, toastErro, toasts, fecharToast,
   }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

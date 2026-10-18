@@ -1,6 +1,7 @@
 import { NavLink, Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { CircleHelp, House, LayoutDashboard, LogIn, MessageCircle, Plus, Recycle, User } from 'lucide-react'
 import { useStore } from '../store'
+import Avatar from './Avatar'
 import { Carregando, Toasts, Vazio } from './ui'
 
 export function Logo() {
@@ -20,7 +21,7 @@ export default function Layout() {
     { to: '/', label: 'Mural', icon: House, end: true },
     { to: '/conversas', label: 'Conversas', icon: MessageCircle, badge: naoLidas },
     ...(isAdmin ? [{ to: '/painel', label: 'Painel', icon: LayoutDashboard }] : []),
-    { to: '/perfil', label: 'Meu perfil', icon: User },
+    { to: '/perfil', label: 'Meu perfil', icon: User, avatar: user },
   ]
 
   return (
@@ -33,7 +34,7 @@ export default function Layout() {
           <nav className="topnav" aria-label="Principal">
             {links.map((l) => (
               <NavLink key={l.to} to={l.to} end={l.end} className="topnav-link">
-                <l.icon size={18} aria-hidden="true" /> {l.label}
+                {l.avatar ? <Avatar usuario={l.avatar} tamanho={24} /> : <l.icon size={18} aria-hidden="true" />} {l.label}
                 {l.badge > 0 && <span className="dot-count" aria-label={`${l.badge} não lidas`}>{l.badge}</span>}
               </NavLink>
             ))}
@@ -67,11 +68,11 @@ export default function Layout() {
   )
 }
 
-function Tab({ to, label, icon: I, end, badge }) {
+function Tab({ to, label, icon: I, end, badge, avatar }) {
   return (
     <NavLink to={to} end={end} className="tab">
       <span className="tab-icon">
-        <I size={22} aria-hidden="true" />
+        {avatar ? <Avatar usuario={avatar} tamanho={26} /> : <I size={22} aria-hidden="true" />}
         {badge > 0 && <span className="dot-count" aria-label={`${badge} não lidas`}>{badge}</span>}
       </span>
       <span>{label}</span>

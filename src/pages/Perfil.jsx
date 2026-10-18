@@ -4,6 +4,8 @@ import { CircleHelp, LayoutDashboard, LogOut, Plus, Settings } from 'lucide-reac
 import { useStore } from '../store'
 import { api, useApi } from '../api'
 import { PERFIS } from '../data/constantes'
+import Avatar from '../components/Avatar'
+import FotoPerfil from '../components/FotoPerfil'
 import { Campo, Confirmar, ErroCarga, Esqueleto, InputTelefone, ItemCard, Vazio } from '../components/ui'
 import { erroTelefone, formatarTelefone } from '../utils/telefone'
 
@@ -40,7 +42,7 @@ export function Perfil() {
   return (
     <div className="page">
       <section className="card profile">
-        <span className="avatar lg" aria-hidden="true">{user.nome[0]}</span>
+        <Avatar usuario={user} tamanho={72} />
         <div>
           <h1 className="h-md">{user.nome}</h1>
           <p className="muted">{user.email} · {PERFIS[user.perfil]}</p>
@@ -56,6 +58,10 @@ export function Perfil() {
 
       {editando && (
         <div className="account-forms">
+          <section className="card form" aria-label="Foto de perfil">
+            <h2 className="h-sm">Foto de perfil</h2>
+            <FotoPerfil />
+          </section>
           <form className="card form" onSubmit={salvarDados} noValidate>
             <h2 className="h-sm">Meus dados</h2>
             <Campo id="p-nome" label="Nome completo" erro={erros.nome}>

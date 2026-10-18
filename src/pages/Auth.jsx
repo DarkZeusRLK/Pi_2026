@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, Recycle } from 'lucide-react'
 import { useStore } from '../store'
 import { api } from '../api'
+import FotoPerfil from '../components/FotoPerfil'
 import { Campo, Chips, InputTelefone, Toasts } from '../components/ui'
 import { erroTelefone } from '../utils/telefone'
 
@@ -108,7 +109,8 @@ function forcaSenha(s) {
 }
 
 export function Cadastro() {
-  const { setUser, toast } = useStore()
+  const { setUser, toast, config, user } = useStore()
+  const [etapaFoto, setEtapaFoto] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const nav = useNavigate()
   const [params] = useSearchParams()
@@ -135,13 +137,29 @@ export function Cadastro() {
       const { usuario } = await api('/auth/cadastro', { method: 'POST', body: f })
       setUser(usuario)
       toast('Conta criada! Você já está conectado(a).')
-      nav(params.get('voltar') || '/', { replace: true })
+      // etapa opcional: foto de perfil (só se o armazenamento estiver configurado)
+      if (config.upload) setEtapaFoto(true)
+      else nav(params.get('voltar') || '/', { replace: true })
     } catch (err) {
       setErros({ [err.campo || 'email']: err.message })
       document.getElementById(err.campo || 'email')?.focus()
     } finally {
       setEnviando(false)
     }
+  }
+
+  if (etapaFoto && user) {
+    const concluir = () => nav(params.get('voltar') || '/', { replace: true })
+    return (
+      <AuthShell>
+        <h1 className="auth-title">Quase lá!</h1>
+        <p className="auth-sub">Uma foto ajuda outras pessoas a confiar em você na hora de combinar a troca. É opcional.</p>
+        <FotoPerfil rotuloAdicionar="Adicionar foto agora" />
+        <button className={`btn btn-block ${user.avatarUrl ? 'btn-primary' : 'btn-outline'}`} onClick={concluir}>
+          {user.avatarUrl ? 'Continuar' : 'Fazer depois'}
+        </button>
+      </AuthShell>
+    )
   }
 
   return (

@@ -4,6 +4,7 @@ import { ArrowLeft, Heart, MessageCircle, Pencil, Phone, Store, Trash2, Users } 
 import { tempoRelativo, useStore } from '../store'
 import { api, useApi } from '../api'
 import { PERFIS, STATUS } from '../data/constantes'
+import Avatar from '../components/Avatar'
 import { Badge, Carregando, Confirmar, ErroCarga, Thumb, Vazio } from '../components/ui'
 
 export default function ItemDetail() {
@@ -120,9 +121,18 @@ export default function ItemDetail() {
             {item.tamanho && <div><dt>Tamanho</dt><dd>{item.tamanho}</dd></div>}
             {item.observacoes && <div><dt>Observação</dt><dd>{item.observacoes}</dd></div>}
             <div><dt>Retirada na secretaria</dt><dd>{item.retiradaSecretaria ? 'Sim' : 'Não — combinar pelo chat'}</dd></div>
-            <div><dt>Publicado</dt><dd>{tempoRelativo(item.criadoEm)} por {item.dono.nome} <small className="muted">({PERFIS[item.dono.perfil]})</small></dd></div>
+            <div><dt>Publicado</dt><dd>{tempoRelativo(item.criadoEm)}</dd></div>
             <div><dt>Interessados</dt><dd>{item.interessados}</dd></div>
           </dl>
+
+          <section className="card publicado-por" aria-label="Publicado por">
+            <Avatar usuario={item.dono} tamanho={52} />
+            <div>
+              <p className="muted small">Publicado por</p>
+              <p className="publicado-nome">{item.dono.nome}</p>
+              <p className="muted small">{PERFIS[item.dono.perfil]} · membro desde {new Date(item.dono.membroDesde).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</p>
+            </div>
+          </section>
 
           {!item.souDono && item.status !== 'Entregue' && (
             <div className="actions-stack">
@@ -156,7 +166,7 @@ export default function ItemDetail() {
                   </button>
                   {verInteressados && (interessados.dados ? (
                     <ul className="interessados-lista">
-                      {interessados.dados.map((p) => <li key={p.id}><span>{p.nome} <small className="muted">({PERFIS[p.perfil]})</small></span><small className="muted">{tempoRelativo(p.data)}</small></li>)}
+                      {interessados.dados.map((p) => <li key={p.id}><span className="interessado"><Avatar usuario={p} tamanho={28} /> <span>{p.nome} <small className="muted">({PERFIS[p.perfil]})</small></span></span><small className="muted">{tempoRelativo(p.data)}</small></li>)}
                     </ul>
                   ) : <small className="muted">Carregando...</small>)}
                 </>

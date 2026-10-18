@@ -30,6 +30,7 @@ export function encerrarSessao(res) {
 
 export const usuarioPublico = (u) => u && ({
   id: u.id, nome: u.nome, email: u.email, telefone: u.telefone, perfil: u.perfil, ativo: u.ativo,
+  avatarUrl: u.avatar_url || null, membroDesde: u.data_cadastro,
 })
 
 // Lê o cookie em toda requisição e carrega o usuário (ou null)

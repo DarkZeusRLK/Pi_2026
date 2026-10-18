@@ -328,7 +328,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .status-select.st-Reservado { background: #fdf5d8; }
 .status-select.st-Entregue { background: var(--gray); }
 .avatar { width: 48px; height: 48px; border-radius: 50%; background: var(--mint); color: var(--green-900); display: grid; place-items: center; font-weight: 600; font-size: 1.1rem; }
-.avatar.lg { width: 72px; height: 72px; font-size: 1.6rem; }
+
 
 /* ---------- Perfil e ajuda ---------- */
 .profile { display: grid; gap: 14px; padding: 18px; margin-bottom: 20px; justify-items: start; }
@@ -451,3 +451,31 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .composer .counter { align-self: center; margin: 0; color: #d6efe6; }
 .composer .counter-medio { color: #ffe9a8; }
 .composer .counter-alto, .composer .counter-limite { color: #ffd2cc; }
+
+/* ---------- Avatar e foto de perfil ---------- */
+.av { display: inline-grid; place-items: center; flex: none; border-radius: 50%; overflow: hidden; object-fit: cover; font-weight: 600; line-height: 1; user-select: none; }
+.av-ini { background: hsl(var(--h) 45% 84%); color: hsl(var(--h) 55% 20%); }
+.av-foto { background: var(--mint-50); }
+.foto-perfil { display: flex; gap: 16px; align-items: flex-start; }
+.foto-perfil-acoes { display: grid; gap: 8px; min-width: 0; }
+.progresso { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.progresso-barra { flex: 1 1 100%; height: 6px; border-radius: 99px; background: var(--gray); overflow: hidden; }
+.progresso-barra span { display: block; height: 100%; width: 100%; background: var(--green); transform-origin: left; transition: transform .2s ease-out; }
+.crop-dialog { display: grid; gap: 12px; justify-items: center; }
+.crop-dialog > * { justify-self: stretch; }
+.crop-dialog > .crop-view { justify-self: center; }
+.crop-view { position: relative; overflow: hidden; border-radius: var(--radius); background: #222; touch-action: none; cursor: grab; }
+.crop-view:active { cursor: grabbing; }
+.crop-view img { position: absolute; left: 0; top: 0; max-width: none; user-select: none; -webkit-user-drag: none; }
+.crop-mascara { position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 999px rgba(0, 0, 0, .55); border: 2px solid rgba(255, 255, 255, .85); pointer-events: none; }
+.crop-carregando { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; color: #fff; }
+.crop-zoom { display: flex; align-items: center; gap: 8px; }
+.crop-zoom input { flex: 1; min-height: 32px; padding: 0; border: 0; accent-color: var(--green); }
+.publicado-por { display: flex; align-items: center; gap: 14px; padding: 14px 16px; }
+.publicado-nome { font-weight: 600; }
+.interessado { display: inline-flex; align-items: center; gap: 8px; }
+.conv-avatar { position: relative; flex: none; }
+.conv-avatar-outro { position: absolute; right: -6px; bottom: -6px; border: 2px solid var(--surface); box-sizing: content-box; }
+.topnav-link .av, .tab-icon .av { vertical-align: middle; }
+.tab-icon { display: inline-grid; }
+.chat-head .av { border: 2px solid rgba(255, 255, 255, .6); }

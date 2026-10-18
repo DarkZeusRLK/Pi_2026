@@ -76,3 +76,6 @@ CREATE TABLE IF NOT EXISTS mensagens (
   lida        BOOLEAN NOT NULL DEFAULT FALSE
 );
 CREATE INDEX IF NOT EXISTS idx_mensagens_conversa ON mensagens (conversa_id, enviada_em);
+
+-- Etapa 2: foto de perfil (URL do Vercel Blob)
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS avatar_url TEXT;

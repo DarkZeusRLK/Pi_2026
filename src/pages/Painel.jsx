@@ -4,6 +4,7 @@ import { Clock, Heart, Package, PackageCheck, Pencil, Plus, Search, Trash2 } fro
 import { tempoRelativo, useStore } from '../store'
 import { api, useApi } from '../api'
 import { PERFIS, STATUS } from '../data/constantes'
+import Avatar from '../components/Avatar'
 import { formatarTelefone } from '../utils/telefone'
 import { Badge, Confirmar, ErroCarga, Esqueleto, Thumb, Vazio } from '../components/ui'
 
@@ -141,7 +142,7 @@ export default function Painel() {
               <ul className="admin-list">
                 {usuarios.dados.map((u) => (
                   <li key={u.id} className={`card admin-row ${u.ativo ? '' : 'is-muted'}`}>
-                    <span className="avatar" aria-hidden="true">{u.nome[0]}</span>
+                    <Avatar usuario={u} tamanho={44} />
                     <div className="admin-row-info">
                       <b>{u.nome}</b>
                       <small className="muted">{u.email}{u.telefone && ` · ${formatarTelefone(u.telefone)}`} · {PERFIS[u.perfil]} · {u.anuncios} anúncio(s)</small>

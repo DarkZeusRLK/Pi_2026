@@ -5,6 +5,8 @@ import { query, transaction } from './db.js'
 import {
   carregarUsuario, emitirSessao, encerrarSessao, exigirAdmin, exigirLogin, usuarioPublico,
 } from './auth.js'
+import { handleUpload } from '@vercel/blob/client'
+import { apagarBlob, blobAtivo, urlDaLoja } from './blob.js'
 import { erroTelefone, somenteDigitos } from '../src/utils/telefone.js'
 
 const app = express()
@@ -88,13 +90,71 @@ app.patch('/api/auth/senha', exigirLogin, r(async (req, res) => {
   res.json({ ok: true })
 }))
 
+// Atualiza só o que veio no corpo: { nome, telefone } e/ou { avatarUrl } (URL do Blob Store, ou null para remover)
 app.patch('/api/auth/perfil', exigirLogin, r(async (req, res) => {
-  const nome = texto(req.body.nome, 120)
-  const telefone = somenteDigitos(texto(req.body.telefone, 40))
-  if (nome.split(/\s+/).length < 2) return falha(res, 400, 'Informe nome e sobrenome.', 'nome')
-  if (erroTelefone(telefone)) return falha(res, 400, erroTelefone(telefone), 'telefone')
-  const { rows } = await query('UPDATE usuarios SET nome = $1, telefone = $2 WHERE id = $3 RETURNING *', [nome, telefone || null, req.usuario.id])
+  const u = req.usuario
+  const sets = []
+  const p = []
+  const set = (coluna, valor) => { p.push(valor); sets.push(`${coluna} = $${p.length}`) }
+
+  if (req.body.nome !== undefined || req.body.telefone !== undefined) {
+    const nome = texto(req.body.nome ?? u.nome, 120)
+    const telefone = somenteDigitos(texto(req.body.telefone ?? u.telefone ?? '', 40))
+    if (nome.split(/\s+/).length < 2) return falha(res, 400, 'Informe nome e sobrenome.', 'nome')
+    if (erroTelefone(telefone)) return falha(res, 400, erroTelefone(telefone), 'telefone')
+    set('nome', nome)
+    set('telefone', telefone || null)
+  }
+
+  let apagar = null
+  if (req.body.avatarUrl !== undefined) {
+    const nova = req.body.avatarUrl
+    if (nova !== null && !urlDaLoja(nova, `avatares/${u.id}/`)) {
+      return falha(res, 400, 'Foto inválida. Envie a foto de novo pelo botão “Trocar foto”.', 'avatarUrl')
+    }
+    if (nova !== u.avatar_url) { set('avatar_url', nova); apagar = u.avatar_url }
+  }
+
+  if (!sets.length) return res.json({ usuario: usuarioPublico(u) })
+  p.push(u.id)
+  const { rows } = await query(`UPDATE usuarios SET ${sets.join(', ')} WHERE id = $${p.length} RETURNING *`, p)
+  if (apagar) await apagarBlob(apagar) // troca ou remoção: o arquivo antigo não fica órfão no Blob
   res.json({ usuario: usuarioPublico(rows[0]) })
+}))
+
+/* =============================== UPLOADS =============================== */
+
+// Quais recursos externos estão ligados (o site avisa na interface o que estiver desativado)
+app.get('/api/config', (_req, res) => {
+  res.json({ upload: blobAtivo(), tempoReal: !!process.env.ABLY_API_KEY })
+})
+
+// Client upload do Vercel Blob: o navegador envia o arquivo direto para o Blob (sem o limite de ~4,5 MB do corpo das funções).
+// Aqui só autorizamos: usuário logado, pasta própria, tipo e tamanho permitidos.
+const IMAGENS_AVATAR = ['image/jpeg', 'image/png', 'image/webp']
+app.post('/api/uploads', r(async (req, res) => {
+  if (!blobAtivo()) return falha(res, 503, 'O envio de arquivos está desativado: o armazenamento (Vercel Blob) ainda não foi configurado.')
+  try {
+    const json = await handleUpload({
+      body: req.body,
+      request: req,
+      onBeforeGenerateToken: async (pathname, clientPayload) => {
+        const u = req.usuario
+        if (!u) throw new Error('Entre na sua conta para enviar arquivos.')
+        let info = {}
+        try { info = JSON.parse(clientPayload || '{}') } catch { /* payload inválido cai no erro abaixo */ }
+        if (info.tipo === 'avatar') {
+          if (!pathname.startsWith(`avatares/${u.id}/`) || pathname.includes('..')) throw new Error('Pasta de envio inválida.')
+          return { allowedContentTypes: IMAGENS_AVATAR, maximumSizeInBytes: 2 * 1024 * 1024, addRandomSuffix: true, tokenPayload: JSON.stringify({ u: u.id }) }
+        }
+        throw new Error('Tipo de envio inválido.')
+      },
+      onUploadCompleted: async () => {}, // o banco só muda depois, por PATCH /api/auth/perfil
+    })
+    res.json(json)
+  } catch (e) {
+    falha(res, 400, e.message)
+  }
 }))
 
 /* ============================== CATEGORIAS ============================== */
@@ -129,7 +189,7 @@ app.delete('/api/categorias/:catId', exigirAdmin, r(async (req, res) => {
 const SELECT_ITEM = `
   SELECT i.id, i.titulo, i.descricao, i.categoria_id, c.nome AS categoria, i.tipo, i.estado_conservacao,
          i.tamanho, i.observacoes, i.retirada_secretaria, i.status, i.criado_em, i.dono_id,
-         u.nome AS dono_nome, u.perfil AS dono_perfil, u.telefone AS dono_telefone,
+         u.nome AS dono_nome, u.perfil AS dono_perfil, u.telefone AS dono_telefone, u.avatar_url AS dono_avatar, u.data_cadastro AS dono_desde,
          (SELECT count(*)::int FROM interesses x WHERE x.item_id = i.id) AS interessados,
          (SELECT coalesce(array_agg(f.id ORDER BY f.ordem), '{}') FROM fotos f WHERE f.item_id = i.id) AS foto_ids,
          EXISTS (SELECT 1 FROM interesses x WHERE x.item_id = i.id AND x.usuario_id = $1::uuid) AS eu_interessado
@@ -163,6 +223,8 @@ function serializarItem(row, usuario) {
       id: row.dono_id,
       nome: row.dono_nome,
       perfil: row.dono_perfil,
+      avatarUrl: row.dono_avatar || null,
+      membroDesde: row.dono_desde,
       // telefone só aparece para quem está logado (privacidade)
       telefone: usuario ? row.dono_telefone : null,
       temWhatsapp: !!row.dono_telefone,
@@ -329,7 +391,7 @@ app.post('/api/itens/:id/interesse', exigirLogin, r(async (req, res) => {
 app.get('/api/itens/:id/interessados', exigirLogin, r(async (req, res) => {
   if (!(await exigirGerencia(req, res))) return
   const { rows } = await query(
-    `SELECT u.id, u.nome, u.perfil, x.data FROM interesses x JOIN usuarios u ON u.id = x.usuario_id
+    `SELECT u.id, u.nome, u.perfil, u.avatar_url AS "avatarUrl", x.data FROM interesses x JOIN usuarios u ON u.id = x.usuario_id
      WHERE x.item_id = $1 ORDER BY x.data`, [req.params.id])
   res.json(rows)
 }))
@@ -350,7 +412,7 @@ app.get('/api/conversas', exigirLogin, r(async (req, res) => {
   const { rows } = await query(`
     SELECT c.id, c.item_id, i.titulo, i.status, i.categoria_id, cat.nome AS categoria,
            (SELECT f.id FROM fotos f WHERE f.item_id = i.id ORDER BY f.ordem LIMIT 1) AS capa_id,
-           o.id AS outro_id, o.nome AS outro_nome,
+           o.id AS outro_id, o.nome AS outro_nome, o.avatar_url AS outro_avatar,
            m.conteudo AS ultima, m.autor_id AS ultima_autor, m.enviada_em AS ultima_em,
            (SELECT count(*)::int FROM mensagens x WHERE x.conversa_id = c.id AND x.autor_id <> $1 AND NOT x.lida) AS nao_lidas
     FROM conversas c
@@ -363,7 +425,7 @@ app.get('/api/conversas', exigirLogin, r(async (req, res) => {
   res.json(rows.map((x) => ({
     id: x.id,
     item: { id: x.item_id, titulo: x.titulo, status: x.status, categoria: x.categoria, capa: x.capa_id ? `/api/fotos/${x.capa_id}` : null },
-    outro: { id: x.outro_id, nome: x.outro_nome },
+    outro: { id: x.outro_id, nome: x.outro_nome, avatarUrl: x.outro_avatar || null },
     ultima: x.ultima ? { texto: x.ultima, minha: x.ultima_autor === req.usuario.id, em: x.ultima_em } : null,
     naoLidas: x.nao_lidas,
   })))
@@ -397,7 +459,7 @@ app.get('/api/conversas/:id', exigirLogin, r(async (req, res) => {
   const outroId = c.dono_id === req.usuario.id ? c.interessado_id : c.dono_id
   const [item, outro, msgs] = await Promise.all([
     buscarItem(c.item_id, req.usuario),
-    query('SELECT id, nome, perfil FROM usuarios WHERE id = $1', [outroId]),
+    query('SELECT id, nome, perfil, avatar_url AS "avatarUrl" FROM usuarios WHERE id = $1', [outroId]),
     query('SELECT id, autor_id, conteudo, enviada_em, lida FROM mensagens WHERE conversa_id = $1 ORDER BY enviada_em', [c.id]),
   ])
   res.json({
@@ -444,7 +506,7 @@ app.get('/api/admin/resumo', exigirAdmin, r(async (_req, res) => {
 
 app.get('/api/admin/usuarios', exigirAdmin, r(async (_req, res) => {
   const { rows } = await query(`
-    SELECT u.id, u.nome, u.email, u.telefone, u.perfil, u.ativo, u.data_cadastro,
+    SELECT u.id, u.nome, u.email, u.telefone, u.perfil, u.ativo, u.data_cadastro, u.avatar_url AS "avatarUrl",
            (SELECT count(*)::int FROM itens i WHERE i.dono_id = u.id AND i.removido_em IS NULL) AS anuncios
     FROM usuarios u ORDER BY u.data_cadastro DESC`)
   res.json(rows)
@@ -458,7 +520,7 @@ app.patch('/api/admin/usuarios/:id', exigirAdmin, r(async (req, res) => {
   if ([...PERFIS_CADASTRO, 'admin'].includes(req.body.perfil)) { p.push(req.body.perfil); sets.push(`perfil = $${p.length}`) }
   if (!sets.length) return falha(res, 400, 'Nada para alterar.')
   p.push(req.params.id)
-  const { rows } = await query(`UPDATE usuarios SET ${sets.join(', ')} WHERE id = $${p.length} RETURNING id, nome, email, telefone, perfil, ativo, data_cadastro`, p)
+  const { rows } = await query(`UPDATE usuarios SET ${sets.join(', ')} WHERE id = $${p.length} RETURNING id, nome, email, telefone, perfil, ativo, data_cadastro, avatar_url AS "avatarUrl"`, p)
   if (!rows[0]) return falha(res, 404, 'Usuário não encontrado.')
   res.json(rows[0])
 }))
