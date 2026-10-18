@@ -2,12 +2,18 @@
 // - o servidor só PUBLICA (SDK REST do Ably) depois de gravar no banco, que continua sendo a fonte da verdade;
 // - o navegador conecta direto no Ably usando um token de curta duração e permissões mínimas (GET /api/realtime/token).
 // A ABLY_API_KEY nunca sai do servidor. Sem ela, nada aqui faz efeito e o site usa polling.
-import Ably from 'ably'
 
 export const tempoRealAtivo = () => !!process.env.ABLY_API_KEY
 
+// O SDK só é carregado quando existe chave (deixa a função serverless mais leve no início)
 let rest
-const cliente = () => (rest ??= new Ably.Rest({ key: process.env.ABLY_API_KEY }))
+async function cliente() {
+  if (!rest) {
+    const { default: Ably } = await import('ably')
+    rest = new Ably.Rest({ key: process.env.ABLY_API_KEY })
+  }
+  return rest
+}
 
 const TEMPO_MAX_MS = 3000
 
@@ -16,7 +22,7 @@ export async function publicar(canal, evento, dados) {
   if (!tempoRealAtivo()) return
   try {
     await Promise.race([
-      cliente().channels.get(canal).publish(evento, dados),
+      cliente().then((c) => c.channels.get(canal).publish(evento, dados)),
       new Promise((_, rej) => setTimeout(() => rej(new Error('tempo esgotado')), TEMPO_MAX_MS)),
     ])
   } catch (e) {
@@ -44,6 +50,6 @@ export function montarCapability(usuarioId, conversaIds) {
   return cap
 }
 
-export function pedirToken(clientId, capability) {
-  return cliente().auth.createTokenRequest({ clientId, capability: JSON.stringify(capability), ttl: 60 * 60 * 1000 })
+export async function pedirToken(clientId, capability) {
+  return (await cliente()).auth.createTokenRequest({ clientId, capability: JSON.stringify(capability), ttl: 60 * 60 * 1000 })
 }
