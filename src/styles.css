@@ -601,8 +601,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .spinner { width: 20px; height: 20px; border-radius: 50%; border: 2.5px solid var(--mint); border-top-color: var(--green); animation: gira .8s linear infinite; }
 .btn .spinner { width: 16px; height: 16px; border-color: var(--bar-line); border-top-color: var(--white); }
 @keyframes gira { to { transform: rotate(360deg); } }
-.interessados-lista { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: .9rem; }
-.interessados-lista li { display: flex; justify-content: space-between; gap: 8px; }
+.interessados-lista { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; animation: lista-entra .2s ease-out; }
+@keyframes lista-entra { from { opacity: 0; transform: translateY(-6px); } }
 .account-forms { display: grid; gap: 16px; margin-bottom: 20px; }
 .account-forms .form { padding: 18px; align-content: start; }
 .cat-form { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -721,3 +721,20 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .auth-tema { position: absolute; top: 12px; right: 12px; }
 .aparencia { padding: 16px 18px; display: grid; gap: 10px; margin-bottom: 20px; }
 .anexo-menu button:focus-visible { outline-color: var(--focus); }
+
+/* ---------- Interessados: cartões com Conversar / WhatsApp ---------- */
+.manage .link { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; }
+.interessado-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); scroll-margin-bottom: calc(var(--tabbar-h) + 100px); }
+.interessado-info { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 9rem; }
+.interessado-txt { display: grid; min-width: 0; line-height: 1.3; }
+.interessado-nome { overflow-wrap: anywhere; font-weight: 500; }
+.interessado-txt small { overflow-wrap: anywhere; }
+.interessado-acoes { display: flex; align-items: center; gap: 8px; flex: 0 1 auto; min-width: 0; }
+.interessado-card .btn { min-height: 44px; }
+.interessado-conversar { padding: 0 16px; }
+.btn-icone { width: 44px; min-width: 44px; padding: 0; flex: none; }
+@media (max-width: 599px) {
+  .interessado-info { flex-basis: 100%; }
+  .interessado-acoes { flex: 1 1 100%; }
+  .interessado-conversar { flex: 1; min-width: 0; }
+}

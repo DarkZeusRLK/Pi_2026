@@ -9,6 +9,39 @@ import { PERFIS, STATUS } from '../data/constantes'
 import Avatar from '../components/Avatar'
 import { Badge, Carregando, Confirmar, ErroCarga, Thumb, Vazio } from '../components/ui'
 
+// Um interessado na lista do dono: quem é, há quanto tempo, e botões para conversar no chat ou no WhatsApp
+function CartaoInteressado({ pessoa, titulo, mostrarAcoes, ocupado, bloqueado, aoConversar }) {
+  const primeiroNome = pessoa.nome.split(' ')[0]
+  const jaTemConversa = !!pessoa.conversaId
+  const zap = pessoa.telefone && `https://wa.me/55${pessoa.telefone}?text=${encodeURIComponent(`Olá, ${primeiroNome}! Vi seu interesse em "${titulo}" no ReUse Escolar.`)}`
+  return (
+    <li className="interessado-card">
+      <div className="interessado-info">
+        <Avatar usuario={pessoa} tamanho={40} />
+        <div className="interessado-txt">
+          <b className="interessado-nome">{pessoa.nome}</b>
+          <small className="muted">{PERFIS[pessoa.perfil]} · interesse {tempoRelativo(pessoa.data)}</small>
+        </div>
+      </div>
+      {mostrarAcoes && (
+        <div className="interessado-acoes">
+          <button type="button" className="btn btn-primary interessado-conversar" onClick={aoConversar} disabled={bloqueado}
+            aria-label={`${jaTemConversa ? 'Abrir conversa com' : 'Conversar com'} ${pessoa.nome}`}>
+            {ocupado ? <><span className="spinner" aria-hidden="true" /> Abrindo...</>
+              : <><MessageCircle size={18} aria-hidden="true" /> {jaTemConversa ? 'Abrir conversa' : 'Conversar'}</>}
+          </button>
+          {zap && (
+            <a className="btn btn-outline btn-icone" href={zap} target="_blank" rel="noreferrer"
+              aria-label={`Chamar ${pessoa.nome} no WhatsApp`} title={`Chamar ${primeiroNome} no WhatsApp`}>
+              <Phone size={18} aria-hidden="true" />
+            </a>
+          )}
+        </div>
+      )}
+    </li>
+  )
+}
+
 export default function ItemDetail() {
   const { id } = useParams()
   const nav = useNavigate()
@@ -20,6 +53,7 @@ export default function ItemDetail() {
   const [verInteressados, setVerInteressados] = useState(false)
   const interessados = useApi(verInteressados ? `/itens/${id}/interessados` : null)
   const [pulsar, setPulsar] = useState(false)
+  const [chamando, setChamando] = useState(null) // id da pessoa cuja conversa está sendo aberta
 
   // mudanças neste item (status, edição, interesse, remoção) aparecem sem F5
   const atualizarAoVivo = useDebounce(() => { recarregar(true); if (verInteressados) interessados.recarregar(true) }, 250)
@@ -52,6 +86,18 @@ export default function ItemDetail() {
         acao: { texto: 'Desfazer', fn: () => api(`/itens/${id}/interesse`, { method: 'POST' }).then(setItem).catch(toastErro) },
       })
     } catch (e) { toastErro(e) } finally { setOcupado(false) }
+  }
+
+  // Dono chama um interessado: abre (ou reaproveita) a conversa e vai direto para o chat dela
+  async function chamar(pessoa) {
+    setChamando(pessoa.id)
+    try {
+      const { id: conv } = await api('/conversas', { method: 'POST', body: { itemId: id, usuarioId: pessoa.id } })
+      nav(`/conversas/${conv}`)
+    } catch (e) {
+      toastErro(e)
+      setChamando(null)
+    }
   }
 
   async function conversar() {
@@ -175,7 +221,10 @@ export default function ItemDetail() {
                   </button>
                   {verInteressados && (interessados.dados ? (
                     <ul className="interessados-lista">
-                      {interessados.dados.map((p) => <li key={p.id}><span className="interessado"><Avatar usuario={p} tamanho={28} /> <span>{p.nome} <small className="muted">({PERFIS[p.perfil]})</small></span></span><small className="muted">{tempoRelativo(p.data)}</small></li>)}
+                      {interessados.dados.map((p) => (
+                        <CartaoInteressado key={p.id} pessoa={p} titulo={item.titulo} mostrarAcoes={item.souDono}
+                          ocupado={chamando === p.id} bloqueado={!!chamando} aoConversar={() => chamar(p)} />
+                      ))}
                     </ul>
                   ) : <small className="muted">Carregando...</small>)}
                 </>

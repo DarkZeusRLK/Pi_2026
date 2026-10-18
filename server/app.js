@@ -412,9 +412,15 @@ app.post('/api/itens/:id/interesse', exigirLogin, r(async (req, res) => {
 
 app.get('/api/itens/:id/interessados', exigirLogin, r(async (req, res) => {
   if (!(await exigirGerencia(req, res))) return
+  // conversaId: conversa já existente entre o DONO e a pessoa sobre este item (null se ainda não houve, ou se quem pede é só moderador)
   const { rows } = await query(
-    `SELECT u.id, u.nome, u.perfil, u.avatar_url AS "avatarUrl", x.data FROM interesses x JOIN usuarios u ON u.id = x.usuario_id
-     WHERE x.item_id = $1 ORDER BY x.data`, [req.params.id])
+    `SELECT u.id, u.nome, u.perfil, u.telefone, u.avatar_url AS "avatarUrl", x.data,
+            (SELECT c.id FROM conversas c WHERE c.item_id = x.item_id AND c.interessado_id = u.id AND c.dono_id = i.dono_id
+              AND i.dono_id = $2) AS "conversaId"
+     FROM interesses x
+     JOIN usuarios u ON u.id = x.usuario_id
+     JOIN itens i ON i.id = x.item_id
+     WHERE x.item_id = $1 ORDER BY x.data`, [req.params.id, req.usuario.id])
   res.json(rows)
 }))
 
@@ -486,17 +492,46 @@ app.get('/api/conversas', exigirLogin, r(async (req, res) => {
   })))
 }))
 
-// Abre (ou reaproveita) a conversa do usuário logado sobre um item
+// Abre (ou reaproveita) uma conversa sobre um item. Corpo: { itemId, usuarioId? }
+//  - sem usuarioId: o usuário logado é o interessado e chama o dono;
+//  - com usuarioId: só o DONO do item, e só para quem demonstrou interesse (ou já conversou com ele sobre o item).
 app.post('/api/conversas', exigirLogin, r(async (req, res) => {
   const itemId = String(req.body.itemId || '')
   if (!UUID.test(itemId)) return falha(res, 400, 'Item inválido.')
-  const { rows: it } = await query('SELECT dono_id FROM itens WHERE id = $1 AND removido_em IS NULL', [itemId])
+  const pedido = req.body.usuarioId
+  if (pedido !== undefined && pedido !== null && !UUID.test(String(pedido))) return falha(res, 400, 'Pessoa inválida.')
+
+  const { rows: it } = await query('SELECT dono_id, titulo FROM itens WHERE id = $1 AND removido_em IS NULL', [itemId])
   if (!it[0]) return falha(res, 404, 'Item não encontrado.')
-  if (it[0].dono_id === req.usuario.id) return falha(res, 400, 'Este item é seu. As conversas aparecem quando alguém te chamar.')
+  const donoId = it[0].dono_id
+  const souDono = donoId === req.usuario.id
+
+  let interessadoId = req.usuario.id
+  if (!pedido) {
+    if (souDono) return falha(res, 400, 'Este item é seu. Escolha um interessado para conversar.')
+  } else {
+    // admin que não é dono também cai aqui: ninguém abre conversa em nome do dono
+    if (!souDono) return falha(res, 403, 'Só quem publicou o item pode chamar os interessados.')
+    if (pedido === req.usuario.id) return falha(res, 400, 'Este item é seu. Escolha um interessado para conversar.')
+    const { rowCount } = await query(
+      `SELECT 1 FROM interesses WHERE item_id = $1 AND usuario_id = $2
+       UNION ALL
+       SELECT 1 FROM conversas WHERE item_id = $1 AND interessado_id = $2 AND dono_id = $3`, [itemId, pedido, donoId])
+    if (!rowCount) return falha(res, 403, 'Só é possível chamar pessoas que demonstraram interesse neste item.')
+    const { rows: alvo } = await query('SELECT ativo FROM usuarios WHERE id = $1', [pedido])
+    if (!alvo[0]?.ativo) return falha(res, 403, 'Esta conta não está ativa. Não é possível iniciar a conversa.')
+    interessadoId = pedido
+  }
+
+  // UNIQUE (item_id, interessado_id): reaproveita a conversa que já existe; "criada" diz se esta chamada a abriu agora
   const { rows } = await query(
     `INSERT INTO conversas (item_id, interessado_id, dono_id) VALUES ($1,$2,$3)
-     ON CONFLICT (item_id, interessado_id) DO UPDATE SET item_id = EXCLUDED.item_id RETURNING id`,
-    [itemId, req.usuario.id, it[0].dono_id])
+     ON CONFLICT (item_id, interessado_id) DO UPDATE SET item_id = EXCLUDED.item_id RETURNING id, (xmax = 0) AS criada`,
+    [itemId, interessadoId, donoId])
+  if (rows[0].criada && pedido) {
+    // a conversa aparece na lista de quem foi chamado na hora
+    await publicar(`usuario:${interessadoId}`, 'conversa-nova', { conversaId: rows[0].id, itemId, titulo: it[0].titulo })
+  }
   res.json({ id: rows[0].id })
 }))
 

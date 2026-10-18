@@ -73,7 +73,7 @@ function useListaConversas() {
   const { user, tempoRealOk } = useStore()
   const lista = useApi('/conversas', { intervalo: tempoRealOk ? null : 15000 })
   const atualizar = useDebounce(() => lista.recarregar(true), 300)
-  useCanal(user ? `usuario:${user.id}` : null, (evento) => { if (evento === 'nao-lidas') atualizar() })
+  useCanal(user ? `usuario:${user.id}` : null, (evento) => { if (evento === 'nao-lidas' || evento === 'conversa-nova') atualizar() })
   useAoReconectar(() => lista.recarregar(true))
   return lista
 }
