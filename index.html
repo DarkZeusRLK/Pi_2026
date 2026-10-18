@@ -4,11 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#1F6B5A" />
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      // Aplica o tema ANTES do React carregar, para a página não "piscar" branca no modo escuro.
+      // Preferência salva em localStorage: "claro", "escuro" ou "auto" (segue o sistema).
+      (function () {
+        try {
+          var pref = localStorage.getItem('reuse-tema');
+          if (pref !== 'claro' && pref !== 'escuro') pref = 'auto';
+          var escuro = pref === 'escuro' || (pref === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var el = document.documentElement;
+          el.setAttribute('data-theme', escuro ? 'dark' : 'light');
+          el.setAttribute('data-tema', pref);
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', escuro ? '#12251f' : '#1F6B5A');
+        } catch (e) { /* sem localStorage: fica no tema claro */ }
+      })();
+    </script>
     <meta name="description" content="ReUse Escolar — troque e doe materiais escolares com a sua escola." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      /* garante o fundo certo mesmo antes do CSS principal chegar */
+      html[data-theme="dark"] { background: #0e1714; color-scheme: dark; }
+      html[data-theme="light"] { background: #f6f3ec; }
+    </style>
     <title>ReUse Escolar</title>
   </head>
   <body>

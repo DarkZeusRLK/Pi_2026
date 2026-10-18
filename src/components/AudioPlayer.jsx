@@ -6,6 +6,7 @@ import { formatarDuracao } from '../utils/anexos'
 // "duracao" (segundos) vem da mensagem: áudios gravados no navegador (WebM) não trazem a duração no arquivo.
 export default function AudioPlayer({ src, duracao, rotulo = 'áudio' }) {
   const audio = useRef(null)
+  const sondando = useRef(false) // enquanto o navegador descobre a duração, ignora eventos e cliques
   const [tocando, setTocando] = useState(false)
   const [atual, setAtual] = useState(0)
   const [total, setTotal] = useState(duracao || 0)
@@ -21,14 +22,23 @@ export default function AudioPlayer({ src, duracao, rotulo = 'áudio' }) {
           a.removeEventListener('timeupdate', voltar)
           a.currentTime = 0
           if (Number.isFinite(a.duration)) setTotal(a.duration)
+          setTimeout(() => { sondando.current = false }, 50)
         }
+        sondando.current = true
         a.addEventListener('timeupdate', voltar)
+        // garantia: se o navegador não avisar, libera o player de qualquer jeito
+        setTimeout(() => {
+          if (!sondando.current) return
+          a.removeEventListener('timeupdate', voltar)
+          sondando.current = false
+          try { a.currentTime = 0 } catch { /* ignora */ }
+        }, 1500)
         a.currentTime = 1e101
       }
     }
     const aoTempo = () => setAtual(a.currentTime)
-    const aoFim = () => { setTocando(false); setAtual(0) }
-    const aoPausar = () => setTocando(false)
+    const aoFim = () => { if (sondando.current) return; setTocando(false); setAtual(0) }
+    const aoPausar = () => { if (!sondando.current) setTocando(false) }
     const aoTocar = () => setTocando(true)
     a.addEventListener('loadedmetadata', aoCarregar)
     a.addEventListener('timeupdate', aoTempo)
@@ -47,7 +57,7 @@ export default function AudioPlayer({ src, duracao, rotulo = 'áudio' }) {
   const duracaoTotal = total || duracao || 0
   const alternar = () => {
     const a = audio.current
-    if (!a) return
+    if (!a || sondando.current) return
     if (a.paused) {
       document.querySelectorAll('audio').forEach((x) => { if (x !== a) x.pause() }) // um áudio por vez
       a.play().catch(() => setTocando(false))

@@ -5,6 +5,7 @@ import { Eye, EyeOff, Recycle } from 'lucide-react'
 import { useStore } from '../store'
 import { api } from '../api'
 import FotoPerfil from '../components/FotoPerfil'
+import { SeletorTema } from '../tema'
 import { Campo, Chips, InputTelefone, Toasts } from '../components/ui'
 import { erroTelefone } from '../utils/telefone'
 
@@ -23,6 +24,7 @@ function AuthShell({ children }) {
         </div>
       </aside>
       <section className="auth-panel">
+        <div className="auth-tema"><SeletorTema /></div>
         <div className="auth-card">{children}</div>
       </section>
       <Toasts />

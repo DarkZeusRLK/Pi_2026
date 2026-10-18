@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { StoreProvider } from './store'
+import { TemaProvider } from './tema'
 import { RealtimeProvider } from './realtime'
 import Layout, { Privada } from './components/Layout'
 import { Cadastro, Login } from './pages/Auth'
@@ -19,6 +20,7 @@ function RolarTopo() {
 
 export default function App() {
   return (
+    <TemaProvider>
     <StoreProvider>
       <BrowserRouter>
        <RealtimeProvider>
@@ -42,5 +44,6 @@ export default function App() {
        </RealtimeProvider>
       </BrowserRouter>
     </StoreProvider>
+    </TemaProvider>
   )
 }

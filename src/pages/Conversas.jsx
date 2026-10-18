@@ -497,10 +497,10 @@ function ChatAberto({ id, lista }) {
           <div className="chat-head-txt">
             {item ? <Link to={`/item/${item.id}`}><b>{item.titulo}</b></Link> : <b>Item removido</b>}
             <small>
-              {outro?.nome}
-              {digitando ? <span className="chat-status chat-status-digitando" role="status"> · digitando…</span>
-                : outroOnline ? <span className="chat-status"> · <span className="online-ponto" aria-hidden="true" />online</span> : null}
-              {item && <> · <Badge>{item.status}</Badge></>}
+              <span className="chat-nome">{outro?.nome}</span>
+              {digitando ? <span className="chat-status chat-status-digitando" role="status">digitando…</span>
+                : outroOnline ? <span className="chat-status"><span className="online-ponto" aria-hidden="true" />online</span> : null}
+              {item && <Badge>{item.status}</Badge>}
             </small>
           </div>
         </header>

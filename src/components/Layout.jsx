@@ -4,6 +4,7 @@ import { CircleHelp, House, LayoutDashboard, LogIn, MessageCircle, Plus, Recycle
 import { useStore } from '../store'
 import Avatar from './Avatar'
 import { IndicadorConexao } from '../realtime'
+import { SeletorTema } from '../tema'
 import { Carregando, Toasts, Vazio } from './ui'
 
 export function Logo() {
@@ -43,6 +44,7 @@ export default function Layout() {
           </nav>
           <div className="topbar-actions">
             <IndicadorConexao />
+            <SeletorTema />
             <Link to="/ajuda" className="icon-btn" aria-label="Ajuda" title="Ajuda"><CircleHelp size={20} /></Link>
             {user ? (
               <button className="btn btn-primary btn-sm hide-mobile" onClick={() => nav('/novo')}>

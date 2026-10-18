@@ -7,6 +7,7 @@ import { useAoReconectar, useCanal, useDebounce } from '../realtime'
 import { PERFIS } from '../data/constantes'
 import Avatar from '../components/Avatar'
 import FotoPerfil from '../components/FotoPerfil'
+import { SeletorTemaChips } from '../tema'
 import { Abas, Campo, Confirmar, ErroCarga, Esqueleto, InputTelefone, ItemCard, Vazio } from '../components/ui'
 import { erroTelefone, formatarTelefone } from '../utils/telefone'
 
@@ -60,6 +61,12 @@ export function Perfil() {
           <button className="btn btn-outline btn-sm" onClick={() => setEditando(!editando)} aria-expanded={editando}><Settings size={16} aria-hidden="true" /> Minha conta</button>
           <button className="btn btn-ghost-danger btn-sm" onClick={() => setConfirmSair(true)}><LogOut size={16} aria-hidden="true" /> Sair</button>
         </div>
+      </section>
+
+      <section className="card aparencia" aria-labelledby="aparencia-titulo">
+        <h2 className="h-sm" id="aparencia-titulo">Aparência</h2>
+        <SeletorTemaChips />
+        <p className="field-hint">Automático acompanha o modo claro ou escuro do seu aparelho.</p>
       </section>
 
       {editando && (
