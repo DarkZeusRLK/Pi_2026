@@ -94,9 +94,10 @@ npm run dev          # API em :3001 e site em http://localhost:5173
 | POST | `/api/itens` | logado |
 | PUT, PATCH `/status`, DELETE, POST `/restaurar` | `/api/itens/:id` | dono ou admin |
 | POST | `/api/itens/:id/interesse` | logado |
-| GET | `/api/itens/:id/interessados` | dono ou admin |
+| GET | `/api/itens/:id/interessados` (nome, perfil, telefone, avatarUrl e conversaId) | dono ou admin |
 | GET | `/api/fotos/:id` | público |
 | GET/POST | `/api/conversas`, `/api/conversas/:id`, `/api/conversas/:id/mensagens` | participantes |
+| POST | `/api/conversas` com `{ itemId, usuarioId }` | só o **dono** do item, e só para quem demonstrou interesse (403 nos outros casos) |
 | POST | `/api/conversas/:id/lidas` | participantes |
 | GET | `/api/notificacoes` | logado |
 | POST | `/api/uploads` (client upload do Vercel Blob: só autoriza) | logado |
