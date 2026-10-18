@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Check, CheckCheck, MessageCircle, Send } from 'lucide-react'
 import { hora, tempoRelativo, useStore } from '../store'
 import { api, useApi } from '../api'
-import { Badge, Carregando, ErroCarga, Esqueleto, Thumb, Vazio } from '../components/ui'
+import { Badge, Carregando, Contador, ErroCarga, Esqueleto, Thumb, Vazio } from '../components/ui'
 
 function ListaConversas({ ativa, lista }) {
   const { dados, erro, carregando, recarregar } = lista
@@ -122,7 +122,8 @@ export function Chat() {
         )}
         <form className="composer" onSubmit={enviar}>
           <label htmlFor="msg" className="sr-only">Mensagem</label>
-          <input id="msg" placeholder="Escreva aqui..." value={texto} onChange={(e) => setTexto(e.target.value)} autoComplete="off" maxLength={500} />
+          <input id="msg" placeholder="Escreva aqui..." value={texto} onChange={(e) => setTexto(e.target.value)} autoComplete="off" maxLength={500} aria-describedby="msg-contador" />
+          {texto.length >= 400 && <Contador id="msg-contador" valor={texto} max={500} />}
           <button className="btn btn-primary" type="submit" disabled={!texto.trim() || enviando} aria-label="Enviar mensagem">
             <Send size={18} aria-hidden="true" /><span className="hide-mobile">{enviando ? 'Enviando...' : 'Enviar'}</span>
           </button>

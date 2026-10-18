@@ -4,6 +4,7 @@ import { Clock, Heart, Package, PackageCheck, Pencil, Plus, Search, Trash2 } fro
 import { tempoRelativo, useStore } from '../store'
 import { api, useApi } from '../api'
 import { PERFIS, STATUS } from '../data/constantes'
+import { formatarTelefone } from '../utils/telefone'
 import { Badge, Confirmar, ErroCarga, Esqueleto, Thumb, Vazio } from '../components/ui'
 
 export default function Painel() {
@@ -102,7 +103,7 @@ export default function Painel() {
           <div className="search-row">
             <div className="search">
               <Search size={18} aria-hidden="true" />
-              <input type="search" placeholder="Buscar anúncio" aria-label="Buscar anúncio" value={busca} onChange={(e) => setBusca(e.target.value)} />
+              <input type="search" maxLength={60} placeholder="Buscar anúncio" aria-label="Buscar anúncio" value={busca} onChange={(e) => setBusca(e.target.value)} />
             </div>
             <select aria-label="Filtrar por situação" value={statusF} onChange={(e) => setStatusF(e.target.value)} className="select-sm">
               <option value="todas">Todas</option>{STATUS.map((s) => <option key={s}>{s}</option>)}
@@ -143,7 +144,7 @@ export default function Painel() {
                     <span className="avatar" aria-hidden="true">{u.nome[0]}</span>
                     <div className="admin-row-info">
                       <b>{u.nome}</b>
-                      <small className="muted">{u.email} · {PERFIS[u.perfil]} · {u.anuncios} anúncio(s)</small>
+                      <small className="muted">{u.email}{u.telefone && ` · ${formatarTelefone(u.telefone)}`} · {PERFIS[u.perfil]} · {u.anuncios} anúncio(s)</small>
                     </div>
                     <Badge tom={u.ativo ? 'green' : 'gray'}>{u.ativo ? 'Ativo' : 'Suspenso'}</Badge>
                     <div className="admin-row-btns">

@@ -124,6 +124,10 @@ textarea { resize: vertical; min-height: 90px; }
 input::placeholder, textarea::placeholder { color: #8f9893; }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px rgba(31,107,90,.18); }
 .has-error input, .has-error select, [aria-invalid=true] { border-color: var(--danger) !important; }
+.field-foot { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.counter { margin-left: auto; flex: none; font-size: .78rem; font-variant-numeric: tabular-nums; color: var(--muted); }
+.counter-medio { color: var(--amber-ink); font-weight: 500; }
+.counter-alto, .counter-limite { color: var(--danger); font-weight: 600; }
 .field-error { display: flex; align-items: center; gap: 6px; color: var(--danger); font-size: .85rem; }
 .field-hint { color: var(--muted); font-size: .85rem; }
 .has-error .chips .chip { border-color: var(--danger); }
@@ -363,9 +367,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .auth-title { color: var(--green); font-size: 2rem; }
 .auth-sub { color: var(--muted); margin-top: -8px; margin-bottom: 8px; }
 .link-center { text-align: center; color: var(--green); font-weight: 500; }
-.demo-box { margin-top: 12px; padding: 14px; border-radius: var(--radius); background: var(--mint-50); border: 1px dashed #8cc7b5; font-size: .85rem; display: grid; gap: 10px; }
-.demo-btns { display: flex; flex-wrap: wrap; gap: 6px; }
-.demo-btns .chip { min-height: 34px; font-size: .8rem; border-color: var(--green); color: var(--green); }
 
 /* ---------- Carregamento ---------- */
 .skeleton { position: relative; overflow: hidden; background: #ece8de; box-shadow: none; }
@@ -447,3 +448,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+.composer .counter { align-self: center; margin: 0; color: #d6efe6; }
+.composer .counter-medio { color: #ffe9a8; }
+.composer .counter-alto, .composer .counter-limite { color: #ffd2cc; }

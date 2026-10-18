@@ -4,7 +4,8 @@ import { CircleHelp, LayoutDashboard, LogOut, Plus, Settings } from 'lucide-reac
 import { useStore } from '../store'
 import { api, useApi } from '../api'
 import { PERFIS } from '../data/constantes'
-import { Campo, Confirmar, ErroCarga, Esqueleto, ItemCard, Vazio } from '../components/ui'
+import { Campo, Confirmar, ErroCarga, Esqueleto, InputTelefone, ItemCard, Vazio } from '../components/ui'
+import { erroTelefone, formatarTelefone } from '../utils/telefone'
 
 export function Perfil() {
   const { user, setUser, isAdmin, sair, toast, toastErro } = useStore()
@@ -12,13 +13,15 @@ export function Perfil() {
   const [aba, setAba] = useState('meus')
   const [confirmSair, setConfirmSair] = useState(false)
   const [editando, setEditando] = useState(false)
-  const [dados, setDadosForm] = useState({ nome: user.nome, telefone: user.telefone || '' })
+  const [dados, setDadosForm] = useState({ nome: user.nome, telefone: formatarTelefone(user.telefone) })
   const [senha, setSenha] = useState({ atual: '', nova: '' })
   const [erros, setErros] = useState({})
   const lista = useApi(aba === 'meus' ? '/itens?situacao=todas&dono=eu' : '/itens?situacao=todas&interesse=eu')
 
   async function salvarDados(e) {
     e.preventDefault()
+    const erroTel = erroTelefone(dados.telefone)
+    if (erroTel) { setErros({ telefone: erroTel }); document.getElementById('p-tel')?.focus(); return }
     try {
       const { usuario } = await api('/auth/perfil', { method: 'PATCH', body: dados })
       setUser(usuario); setErros({}); setEditando(false)
@@ -41,6 +44,7 @@ export function Perfil() {
         <div>
           <h1 className="h-md">{user.nome}</h1>
           <p className="muted">{user.email} · {PERFIS[user.perfil]}</p>
+          {user.telefone && <p className="muted">WhatsApp: {formatarTelefone(user.telefone)}</p>}
           {!user.telefone && <p className="field-hint">Sem WhatsApp cadastrado — interessados só falam com você pelo chat.</p>}
         </div>
         <div className="profile-actions">
@@ -55,10 +59,10 @@ export function Perfil() {
           <form className="card form" onSubmit={salvarDados} noValidate>
             <h2 className="h-sm">Meus dados</h2>
             <Campo id="p-nome" label="Nome completo" erro={erros.nome}>
-              <input id="p-nome" value={dados.nome} onChange={(e) => setDadosForm({ ...dados, nome: e.target.value })} autoComplete="name" />
+              <input id="p-nome" maxLength={120} value={dados.nome} onChange={(e) => setDadosForm({ ...dados, nome: e.target.value })} autoComplete="name" />
             </Campo>
             <Campo id="p-tel" label="WhatsApp (opcional)" erro={erros.telefone} dica="Aparece só para usuários logados.">
-              <input id="p-tel" type="tel" value={dados.telefone} onChange={(e) => setDadosForm({ ...dados, telefone: e.target.value })} placeholder="(43) 99999-0000" />
+              <InputTelefone id="p-tel" valor={dados.telefone} onChange={(v) => setDadosForm({ ...dados, telefone: v })} aria-invalid={!!erros.telefone || undefined} aria-describedby={erros.telefone ? 'p-tel-erro' : undefined} />
             </Campo>
             <button className="btn btn-primary">Salvar dados</button>
           </form>
@@ -68,7 +72,7 @@ export function Perfil() {
               <input id="s-atual" type="password" value={senha.atual} onChange={(e) => setSenha({ ...senha, atual: e.target.value })} autoComplete="current-password" />
             </Campo>
             <Campo id="s-nova" label="Nova senha" erro={erros.nova} dica="Mínimo de 6 caracteres.">
-              <input id="s-nova" type="password" value={senha.nova} onChange={(e) => setSenha({ ...senha, nova: e.target.value })} autoComplete="new-password" />
+              <input id="s-nova" type="password" maxLength={72} value={senha.nova} onChange={(e) => setSenha({ ...senha, nova: e.target.value })} autoComplete="new-password" />
             </Campo>
             <button className="btn btn-primary" disabled={!senha.atual || !senha.nova}>Alterar senha</button>
           </form>

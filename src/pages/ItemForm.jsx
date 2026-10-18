@@ -4,7 +4,7 @@ import { ArrowLeft, CircleAlert, ImagePlus, X } from 'lucide-react'
 import { comprimirImagem, useStore } from '../store'
 import { api, useApi } from '../api'
 import { ESTADOS, TIPOS } from '../data/constantes'
-import { Campo, Carregando, Chips, ErroCarga, ItemCard } from '../components/ui'
+import { Campo, Carregando, Chips, Contador, ErroCarga, ItemCard } from '../components/ui'
 
 const VAZIO = { titulo: '', categoriaId: '', estado: 'Bom estado', tipo: 'Doação', tamanho: '', descricao: '', observacoes: '', retiradaSecretaria: true, fotos: [] }
 const MAX_FOTOS = 4
@@ -152,10 +152,10 @@ function Formulario({ existente }) {
             {f.tipo === 'Troca' && <p className="field-hint">Diga na descrição o que você aceita em troca.</p>}
           </div>
 
-          <Campo id="descricao" label="Descrição">
+          <Campo id="descricao" label="Descrição" contador={<Contador valor={f.descricao} max={400} />}>
             <textarea id="descricao" rows={3} placeholder="Conte como é o item" value={f.descricao} onChange={set('descricao')} maxLength={400} />
           </Campo>
-          <Campo id="observacoes" label="Observações" dica="Rasgos, bordados, nome escrito, marcas de uso.">
+          <Campo id="observacoes" label="Observações" dica="Rasgos, bordados, nome escrito, marcas de uso." contador={<Contador valor={f.observacoes} max={140} />}>
             <input id="observacoes" placeholder="Rasgos, bordados, tamanho" value={f.observacoes} onChange={set('observacoes')} maxLength={140} />
           </Campo>
 

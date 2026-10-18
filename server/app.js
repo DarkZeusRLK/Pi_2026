@@ -5,6 +5,7 @@ import { query, transaction } from './db.js'
 import {
   carregarUsuario, emitirSessao, encerrarSessao, exigirAdmin, exigirLogin, usuarioPublico,
 } from './auth.js'
+import { erroTelefone, somenteDigitos } from '../src/utils/telefone.js'
 
 const app = express()
 app.disable('x-powered-by')
@@ -34,13 +35,14 @@ app.post('/api/auth/cadastro', r(async (req, res) => {
   const nome = texto(req.body.nome, 120)
   const email = texto(req.body.email, 160).toLowerCase()
   const senha = typeof req.body.senha === 'string' ? req.body.senha : ''
-  const telefone = texto(req.body.telefone, 20).replace(/\D/g, '')
+  const telefone = somenteDigitos(texto(req.body.telefone, 40))
   const perfil = PERFIS_CADASTRO.includes(req.body.perfil) ? req.body.perfil : 'responsavel'
 
   if (nome.split(/\s+/).length < 2) return falha(res, 400, 'Informe nome e sobrenome.', 'nome')
   if (!emailValido(email)) return falha(res, 400, 'E-mail inválido. Exemplo: seu@gmail.com', 'email')
-  if (telefone && telefone.length < 10) return falha(res, 400, 'Use DDD + número. Exemplo: (43) 99999-0000', 'telefone')
+  if (erroTelefone(telefone)) return falha(res, 400, erroTelefone(telefone), 'telefone')
   if (senha.length < 6) return falha(res, 400, 'A senha precisa ter pelo menos 6 caracteres.', 'senha')
+  if (senha.length > 72) return falha(res, 400, 'A senha pode ter no máximo 72 caracteres.', 'senha')
 
   const existe = await query('SELECT 1 FROM usuarios WHERE email = $1', [email])
   if (existe.rowCount) return falha(res, 409, 'Já existe uma conta com este e-mail. Que tal entrar?', 'email')
@@ -81,15 +83,16 @@ app.patch('/api/auth/senha', exigirLogin, r(async (req, res) => {
   const { atual = '', nova = '' } = req.body
   if (!(await bcrypt.compare(String(atual), req.usuario.senha_hash))) return falha(res, 400, 'A senha atual está incorreta.', 'atual')
   if (String(nova).length < 6) return falha(res, 400, 'A nova senha precisa ter pelo menos 6 caracteres.', 'nova')
+  if (String(nova).length > 72) return falha(res, 400, 'A nova senha pode ter no máximo 72 caracteres.', 'nova')
   await query('UPDATE usuarios SET senha_hash = $1 WHERE id = $2', [await bcrypt.hash(String(nova), 10), req.usuario.id])
   res.json({ ok: true })
 }))
 
 app.patch('/api/auth/perfil', exigirLogin, r(async (req, res) => {
   const nome = texto(req.body.nome, 120)
-  const telefone = texto(req.body.telefone, 20).replace(/\D/g, '')
+  const telefone = somenteDigitos(texto(req.body.telefone, 40))
   if (nome.split(/\s+/).length < 2) return falha(res, 400, 'Informe nome e sobrenome.', 'nome')
-  if (telefone && telefone.length < 10) return falha(res, 400, 'Use DDD + número. Exemplo: (43) 99999-0000', 'telefone')
+  if (erroTelefone(telefone)) return falha(res, 400, erroTelefone(telefone), 'telefone')
   const { rows } = await query('UPDATE usuarios SET nome = $1, telefone = $2 WHERE id = $3 RETURNING *', [nome, telefone || null, req.usuario.id])
   res.json({ usuario: usuarioPublico(rows[0]) })
 }))

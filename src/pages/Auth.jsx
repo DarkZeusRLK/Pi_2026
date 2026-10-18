@@ -3,7 +3,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, Recycle } from 'lucide-react'
 import { useStore } from '../store'
 import { api } from '../api'
-import { Campo, Chips, Toasts } from '../components/ui'
+import { Campo, Chips, InputTelefone, Toasts } from '../components/ui'
+import { erroTelefone } from '../utils/telefone'
 
 function AuthShell({ children }) {
   return (
@@ -32,7 +33,7 @@ function SenhaInput({ id, value, onChange, placeholder, invalido, describedBy, a
   return (
     <div className="input-wrap">
       <input
-        id={id} type={ver ? 'text' : 'password'} value={value} onChange={onChange} placeholder={placeholder}
+        id={id} type={ver ? 'text' : 'password'} value={value} onChange={onChange} placeholder={placeholder} maxLength={72}
         aria-invalid={invalido || undefined} aria-describedby={describedBy} autoComplete={autoComplete}
       />
       <button type="button" className="input-icon" onClick={() => setVer(!ver)} aria-label={ver ? 'Ocultar senha' : 'Mostrar senha'}>
@@ -52,10 +53,10 @@ export function Login() {
   const [erros, setErros] = useState({})
   const [enviando, setEnviando] = useState(false)
 
-  async function entrar(e, demo) {
-    e?.preventDefault()
-    const em = demo?.email ?? email
-    const se = demo?.senha ?? senha
+  async function entrar(e) {
+    e.preventDefault()
+    const em = email
+    const se = senha
     const er = {}
     if (!em.trim()) er.email = 'Informe seu e-mail.'
     else if (!/^\S+@\S+\.\S+$/.test(em)) er.email = 'E-mail inválido. Exemplo: seu@gmail.com'
@@ -81,7 +82,7 @@ export function Login() {
       <p className="auth-sub">Troque e doe materiais com a sua escola.</p>
       <form onSubmit={entrar} noValidate className="form">
         <Campo id="email" label="E-mail" erro={erros.email}>
-          <input id="email" type="email" inputMode="email" autoComplete="email" placeholder="seu@gmail.com"
+          <input id="email" type="email" inputMode="email" autoComplete="email" placeholder="seu@gmail.com" maxLength={160}
             value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={!!erros.email || undefined}
             aria-describedby={erros.email ? 'email-erro' : undefined} />
         </Campo>
@@ -93,15 +94,6 @@ export function Login() {
         <Link className="btn btn-outline btn-block" to={`/cadastro${voltar !== '/' ? `?voltar=${voltar}` : ''}`}>Criar conta</Link>
       </form>
       <Link to="/" className="link-center">Ver o mural sem entrar</Link>
-
-      <div className="demo-box">
-        <p><b>Contas de demonstração</b> (senha 123456)</p>
-        <div className="demo-btns">
-          <button className="chip" onClick={() => entrar(null, { email: 'secretaria@escola.com', senha: '123456' })}>Secretaria (admin)</button>
-          <button className="chip" onClick={() => entrar(null, { email: 'ana@gmail.com', senha: '123456' })}>Responsável</button>
-          <button className="chip" onClick={() => entrar(null, { email: 'lucas@gmail.com', senha: '123456' })}>Aluno</button>
-        </div>
-      </div>
     </AuthShell>
   )
 }
@@ -131,7 +123,7 @@ export function Cadastro() {
     const er = {}
     if (f.nome.trim().split(' ').length < 2) er.nome = 'Informe nome e sobrenome.'
     if (!/^\S+@\S+\.\S+$/.test(f.email)) er.email = 'E-mail inválido. Exemplo: seu@gmail.com'
-    if (f.telefone && f.telefone.replace(/\D/g, '').length < 10) er.telefone = 'Use DDD + número. Exemplo: (43) 99999-0000'
+    if (erroTelefone(f.telefone)) er.telefone = erroTelefone(f.telefone)
     if (f.senha.length < 6) er.senha = 'A senha precisa ter pelo menos 6 caracteres.'
     setErros(er)
     if (Object.keys(er).length) {
@@ -159,13 +151,13 @@ export function Cadastro() {
       <p className="auth-sub">Leva menos de um minuto.</p>
       <form onSubmit={enviar} noValidate className="form">
         <Campo id="nome" label="Nome completo" erro={erros.nome} obrigatorio>
-          <input id="nome" autoComplete="name" placeholder="Seu nome" value={f.nome} onChange={set('nome')} aria-invalid={!!erros.nome || undefined} />
+          <input id="nome" autoComplete="name" placeholder="Seu nome" maxLength={120} value={f.nome} onChange={set('nome')} aria-invalid={!!erros.nome || undefined} />
         </Campo>
         <Campo id="email" label="E-mail" erro={erros.email} obrigatorio>
-          <input id="email" type="email" inputMode="email" autoComplete="email" placeholder="seu@gmail.com" value={f.email} onChange={set('email')} aria-invalid={!!erros.email || undefined} />
+          <input id="email" type="email" inputMode="email" autoComplete="email" placeholder="seu@gmail.com" maxLength={160} value={f.email} onChange={set('email')} aria-invalid={!!erros.email || undefined} />
         </Campo>
         <Campo id="telefone" label="WhatsApp (opcional)" erro={erros.telefone} dica="Permite que interessados falem com você pelo WhatsApp.">
-          <input id="telefone" type="tel" inputMode="tel" autoComplete="tel" placeholder="(43) 99999-0000" value={f.telefone} onChange={set('telefone')} aria-invalid={!!erros.telefone || undefined} />
+          <InputTelefone id="telefone" valor={f.telefone} onChange={set('telefone')} aria-invalid={!!erros.telefone || undefined} aria-describedby={erros.telefone ? 'telefone-erro' : undefined} />
         </Campo>
         <Campo id="senha" label="Senha" erro={erros.senha} obrigatorio>
           <SenhaInput id="senha" value={f.senha} onChange={set('senha')} placeholder="Crie uma senha forte" invalido={!!erros.senha} autoComplete="new-password" describedBy="forca" />

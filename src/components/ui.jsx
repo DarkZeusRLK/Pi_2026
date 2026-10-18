@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import {
   RotateCcw, WifiOff, Backpack, BookOpen, CircleAlert, CircleCheck, FileText, Info, NotebookPen, Paperclip, PencilRuler, Shirt, X,
 } from 'lucide-react'
 import { useStore } from '../store'
+import { formatarTelefone, posicaoAposDigitos, somenteDigitos } from '../utils/telefone'
 
 const ICONES = { Uniformes: Shirt, Mochilas: Backpack, Estojos: PencilRuler, Livros: BookOpen, Apostilas: FileText, Cadernos: NotebookPen, Papelaria: Paperclip }
 const TONS = { Uniformes: 'mint', Mochilas: 'sky', Estojos: 'peach', Livros: 'sand', Apostilas: 'lilac', Cadernos: 'mint', Papelaria: 'sky' }
@@ -69,13 +70,18 @@ export function Chips({ opcoes, valor, onChange, label, nome }) {
   )
 }
 
-export function Campo({ id, label, erro, dica, obrigatorio, children }) {
+export function Campo({ id, label, erro, dica, obrigatorio, contador, children }) {
   return (
     <div className={`field ${erro ? 'has-error' : ''}`}>
       <label htmlFor={id}>{label}{obrigatorio && <span className="req" aria-hidden="true"> *</span>}</label>
       {children}
-      {erro ? <p className="field-error" id={`${id}-erro`} role="alert"><CircleAlert size={14} aria-hidden="true" /> {erro}</p>
-        : dica && <p className="field-hint" id={`${id}-dica`}>{dica}</p>}
+      {(erro || dica || contador) && (
+        <div className="field-foot">
+          {erro ? <p className="field-error" id={`${id}-erro`} role="alert"><CircleAlert size={14} aria-hidden="true" /> {erro}</p>
+            : dica ? <p className="field-hint" id={`${id}-dica`}>{dica}</p> : <span />}
+          {contador}
+        </div>
+      )}
     </div>
   )
 }
@@ -145,4 +151,62 @@ export function ErroCarga({ erro, onTentar }) {
 
 export function Carregando({ texto = 'Carregando...' }) {
   return <div className="loading" role="status"><span className="spinner" aria-hidden="true" /> {texto}</div>
+}
+
+// Contador "120/400": muda de cor perto do limite (80% = atenção, 95% = quase no limite)
+export function Contador({ valor, max, id }) {
+  const n = (valor || '').length
+  const nivel = n >= max ? 'limite' : n >= max * 0.95 ? 'alto' : n >= max * 0.8 ? 'medio' : 'ok'
+  return <span id={id} className={`counter counter-${nivel}`} aria-label={`${n} de ${max} caracteres`}>{n}/{max}</span>
+}
+
+// Campo de telefone com máscara (43) 99999-0000. "valor" pode vir formatado ou só com dígitos; onChange recebe o texto formatado.
+// - colar +55, espaços e traços normaliza o número;
+// - o cursor fica no lugar ao editar no meio;
+// - Backspace sobre um caractere da máscara apaga o dígito vizinho em vez de "não fazer nada".
+export function InputTelefone({ valor, onChange, ...resto }) {
+  const ref = useRef(null)
+  const cursor = useRef(null)
+
+  useLayoutEffect(() => {
+    if (cursor.current != null && ref.current === document.activeElement) ref.current.setSelectionRange(cursor.current, cursor.current)
+    cursor.current = null
+  })
+
+  const atual = formatarTelefone(valor)
+
+  function alterar(e) {
+    const bruto = e.target.value
+    const pos = e.target.selectionStart ?? bruto.length
+    let digitos = somenteDigitos(bruto)
+    let n = somenteDigitos(bruto.slice(0, pos)).length
+    // apagou só um caractere da máscara: os dígitos não mudaram, então apaga o dígito anterior
+    if (bruto.length < atual.length && digitos === somenteDigitos(atual) && n > 0) {
+      digitos = digitos.slice(0, n - 1) + digitos.slice(n)
+      n -= 1
+    }
+    const novo = formatarTelefone(digitos)
+    cursor.current = posicaoAposDigitos(novo, n)
+    onChange(novo)
+  }
+
+  // maxLength cortaria "+55 43 99989-1733" antes de normalizar, por isso a colagem é tratada aqui
+  function colar(e) {
+    const colado = somenteDigitos(e.clipboardData.getData('text'))
+    if (!colado) return
+    e.preventDefault()
+    const el = e.target
+    const a = somenteDigitos(atual.slice(0, el.selectionStart)).length
+    const b = somenteDigitos(atual.slice(0, el.selectionEnd)).length
+    const todos = somenteDigitos(atual)
+    const digitos = (todos.slice(0, a) + colado + todos.slice(b)).slice(0, 11)
+    const novo = formatarTelefone(digitos)
+    cursor.current = posicaoAposDigitos(novo, Math.min(a + colado.length, 11))
+    onChange(novo)
+  }
+
+  return (
+    <input ref={ref} type="tel" inputMode="tel" autoComplete="tel" maxLength={15} placeholder="(43) 99999-0000"
+      value={atual} onChange={alterar} onPaste={colar} {...resto} />
+  )
 }

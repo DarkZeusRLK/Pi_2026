@@ -69,7 +69,7 @@ export default function Mural() {
       <div className="search-row">
         <div className="search">
           <Search size={18} aria-hidden="true" />
-          <input ref={inputRef} type="search" placeholder="Buscar: camiseta, mochila..." aria-label="Buscar materiais"
+          <input ref={inputRef} type="search" maxLength={60} placeholder="Buscar: camiseta, mochila..." aria-label="Buscar materiais"
             value={buscaDigitada} onChange={(e) => setBuscaDigitada(e.target.value)} />
           {buscaDigitada ? <button className="icon-btn" aria-label="Limpar busca" onClick={() => { setBuscaDigitada(''); setP('q', '', '') }}><X size={16} /></button>
             : <kbd className="hide-mobile" title="Atalho">/</kbd>}
