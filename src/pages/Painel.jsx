@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from '../components/nav'
 import { Clock, Heart, Package, PackageCheck, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { tempoRelativo, useStore } from '../store'
 import { api, useApi } from '../api'
+import { useAoReconectar, useCanal, useDebounce } from '../realtime'
 import { PERFIS, STATUS } from '../data/constantes'
 import Avatar from '../components/Avatar'
 import { formatarTelefone } from '../utils/telefone'
-import { Badge, Confirmar, ErroCarga, Esqueleto, Thumb, Vazio } from '../components/ui'
+import { Abas, Badge, Confirmar, ErroCarga, Esqueleto, Thumb, Vazio } from '../components/ui'
 
 export default function Painel() {
   const { user, toast, toastErro } = useStore()
@@ -25,6 +26,11 @@ export default function Painel() {
   const categorias = useApi(aba === 'categorias' ? '/categorias' : null)
 
   const atualizarTudo = () => { itens.recarregar(true); resumo.recarregar(true) }
+
+  // números e lista mudam ao vivo quando alguém publica, edita, muda a situação ou remove um anúncio
+  const aoVivo = useDebounce(() => { atualizarTudo(); if (aba === 'usuarios') usuarios.recarregar(true) }, 400)
+  useCanal('mural', () => aoVivo())
+  useAoReconectar(() => { atualizarTudo(); if (aba === 'usuarios') usuarios.recarregar(true) })
 
   async function mudarStatus(i, status) {
     try {
@@ -93,11 +99,8 @@ export default function Painel() {
         <div className="stat"><PackageCheck size={20} aria-hidden="true" /><b>{r?.entregues ?? '–'}</b><span>Entregues</span></div>
       </div>
 
-      <div className="tabs" role="tablist" aria-label="Seções do painel">
-        {[['itens', 'Anúncios'], ['usuarios', `Usuários${r ? ` (${r.usuarios})` : ''}`], ['categorias', 'Categorias']].map(([k, t]) => (
-          <button key={k} role="tab" aria-selected={aba === k} className={`tab-btn ${aba === k ? 'is-on' : ''}`} onClick={() => setAba(k)}>{t}</button>
-        ))}
-      </div>
+      <Abas label="Seções do painel" ativa={aba} onChange={setAba}
+        abas={[['itens', 'Anúncios'], ['usuarios', `Usuários${r ? ` (${r.usuarios})` : ''}`], ['categorias', 'Categorias']]} />
 
       {aba === 'itens' && (
         <>

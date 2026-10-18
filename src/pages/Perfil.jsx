@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from '../components/nav'
 import { CircleHelp, LayoutDashboard, LogOut, Plus, Settings } from 'lucide-react'
 import { useStore } from '../store'
 import { api, useApi } from '../api'
+import { useAoReconectar, useCanal, useDebounce } from '../realtime'
 import { PERFIS } from '../data/constantes'
 import Avatar from '../components/Avatar'
 import FotoPerfil from '../components/FotoPerfil'
-import { Campo, Confirmar, ErroCarga, Esqueleto, InputTelefone, ItemCard, Vazio } from '../components/ui'
+import { Abas, Campo, Confirmar, ErroCarga, Esqueleto, InputTelefone, ItemCard, Vazio } from '../components/ui'
 import { erroTelefone, formatarTelefone } from '../utils/telefone'
 
 export function Perfil() {
@@ -19,6 +20,11 @@ export function Perfil() {
   const [senha, setSenha] = useState({ atual: '', nova: '' })
   const [erros, setErros] = useState({})
   const lista = useApi(aba === 'meus' ? '/itens?situacao=todas&dono=eu' : '/itens?situacao=todas&interesse=eu')
+
+  // "Meus anúncios" e "Meus interesses" acompanham o mural ao vivo
+  const aoVivo = useDebounce(() => lista.recarregar(true), 400)
+  useCanal('mural', () => aoVivo())
+  useAoReconectar(() => lista.recarregar(true))
 
   async function salvarDados(e) {
     e.preventDefault()
@@ -85,10 +91,7 @@ export function Perfil() {
         </div>
       )}
 
-      <div className="tabs" role="tablist" aria-label="Meus itens">
-        <button role="tab" aria-selected={aba === 'meus'} className={`tab-btn ${aba === 'meus' ? 'is-on' : ''}`} onClick={() => setAba('meus')}>Meus anúncios</button>
-        <button role="tab" aria-selected={aba === 'int'} className={`tab-btn ${aba === 'int' ? 'is-on' : ''}`} onClick={() => setAba('int')}>Meus interesses</button>
-      </div>
+      <Abas label="Meus itens" ativa={aba} onChange={setAba} abas={[['meus', 'Meus anúncios'], ['int', 'Meus interesses']]} />
 
       {lista.erro ? <ErroCarga erro={lista.erro} onTentar={lista.recarregar} />
         : !lista.dados || lista.carregando ? <Esqueleto linhas={3} />

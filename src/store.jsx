@@ -9,19 +9,22 @@ export function StoreProvider({ children }) {
   const [user, setUser] = useState(null)
   const [carregandoSessao, setCarregandoSessao] = useState(true)
   const [naoLidas, setNaoLidas] = useState(0)
+  const [tempoRealOk, setTempoRealOk] = useState(false) // true = conectado ao Ably (desliga os pollings)
   const [toasts, setToasts] = useState([])
   const [config, setConfig] = useState({ upload: false, tempoReal: false, carregada: false })
   const timers = useRef({})
 
+  // fecharToast marca "saindo" para a animação de saída e só depois remove da lista
+  const fecharToast = useCallback((id) => {
+    clearTimeout(timers.current[id])
+    setToasts((t) => t.map((x) => (x.id === id ? { ...x, saindo: true } : x)))
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 180)
+  }, [])
   const toast = useCallback((msg, opts = {}) => {
     const id = Math.random().toString(36).slice(2)
     setToasts((t) => [...t.slice(-2), { id, msg, tipo: opts.tipo || 'ok', acao: opts.acao }])
-    timers.current[id] = setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), opts.duracao || 4500)
-  }, [])
-  const fecharToast = useCallback((id) => {
-    clearTimeout(timers.current[id])
-    setToasts((t) => t.filter((x) => x.id !== id))
-  }, [])
+    timers.current[id] = setTimeout(() => fecharToast(id), opts.duracao || 4500)
+  }, [fecharToast])
   const toastErro = useCallback((e) => toast(e.message || String(e), { tipo: 'erro' }), [toast])
 
   useEffect(() => {
@@ -39,10 +42,11 @@ export function StoreProvider({ children }) {
 
   useEffect(() => {
     atualizarNaoLidas()
-    if (!user) return
+    // com o tempo real conectado o servidor avisa na hora; o polling só vale como reserva
+    if (!user || tempoRealOk) return undefined
     const t = setInterval(() => { if (document.visibilityState === 'visible') atualizarNaoLidas() }, 20000)
     return () => clearInterval(t)
-  }, [user, atualizarNaoLidas])
+  }, [user, tempoRealOk, atualizarNaoLidas])
 
   const sair = useCallback(async () => {
     await api('/auth/logout', { method: 'POST' }).catch(() => {})
@@ -51,7 +55,7 @@ export function StoreProvider({ children }) {
 
   const value = {
     user, setUser, carregandoSessao, isAdmin: user?.perfil === 'admin', sair,
-    config, naoLidas, atualizarNaoLidas, toast, toastErro, toasts, fecharToast,
+    config, naoLidas, setNaoLidas, atualizarNaoLidas, tempoRealOk, setTempoRealOk, toast, toastErro, toasts, fecharToast,
   }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

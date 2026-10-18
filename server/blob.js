@@ -1,6 +1,6 @@
 // Vercel Blob: armazenamento de fotos de perfil e anexos do chat.
 // Sem BLOB_READ_WRITE_TOKEN o envio de arquivos fica desativado (o resto do site continua funcionando).
-import { del } from '@vercel/blob'
+import { del, head } from '@vercel/blob'
 
 export const blobAtivo = () => !!process.env.BLOB_READ_WRITE_TOKEN
 
@@ -26,4 +26,12 @@ export function urlDaLoja(url, pastaEsperada) {
 export async function apagarBlob(url) {
   if (!url || !blobAtivo() || !urlDaLoja(url, '')) return
   try { await del(url) } catch (e) { console.error('Não foi possível apagar o arquivo antigo do Blob:', e.message) }
+}
+
+// Tamanho e tipo reais do arquivo no Blob (null se não existir)
+export async function infoDoBlob(url) {
+  try {
+    const h = await head(url)
+    return { size: h.size, contentType: h.contentType }
+  } catch { return null }
 }

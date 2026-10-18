@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Link } from './nav'
 import {
   RotateCcw, WifiOff, Backpack, BookOpen, CircleAlert, CircleCheck, FileText, Info, NotebookPen, Paperclip, PencilRuler, Shirt, X,
 } from 'lucide-react'
@@ -35,10 +35,10 @@ export function Badge({ children, tom }) {
   return <span className={`badge badge-${tom || auto || 'mint'}`}>{children}</span>
 }
 
-export function ItemCard({ item }) {
+export function ItemCard({ item, animacao }) {
   const indisponivel = item.status !== 'Disponível'
   return (
-    <Link to={`/item/${item.id}`} className={`card item-card ${indisponivel ? 'is-muted' : ''}`}>
+    <Link to={`/item/${item.id}`} className={`card item-card ${indisponivel ? 'is-muted' : ''} ${animacao ? `is-${animacao}` : ''}`}>
       <Thumb item={item} />
       <div className="item-card-body">
         <h3>{item.titulo}</h3>
@@ -122,7 +122,7 @@ export function Toasts() {
   return (
     <div className="toasts" aria-live="polite" aria-atomic="false">
       {toasts.map((t) => (
-        <div key={t.id} className={`toast toast-${t.tipo}`} role="status">
+        <div key={t.id} className={`toast toast-${t.tipo} ${t.saindo ? 'is-saindo' : ''}`} role="status">
           {t.tipo === 'erro' ? <CircleAlert size={18} aria-hidden="true" /> : <CircleCheck size={18} aria-hidden="true" />}
           <span>{t.msg}</span>
           {t.acao && <button className="toast-action" onClick={() => { t.acao.fn(); fecharToast(t.id) }}>{t.acao.texto}</button>}
@@ -208,5 +208,24 @@ export function InputTelefone({ valor, onChange, ...resto }) {
   return (
     <input ref={ref} type="tel" inputMode="tel" autoComplete="tel" maxLength={15} placeholder="(43) 99999-0000"
       value={atual} onChange={alterar} onPaste={colar} {...resto} />
+  )
+}
+
+// Abas com sublinhado que desliza até a aba ativa (anima só transform)
+export function Abas({ abas, ativa, onChange, label }) {
+  const ref = useRef(null)
+  const [ind, setInd] = useState({ x: 0, w: 0, pronto: false })
+  useLayoutEffect(() => {
+    const el = ref.current?.querySelector('[aria-selected="true"]')
+    if (!el) return
+    setInd((a) => (a.x === el.offsetLeft && a.w === el.offsetWidth ? a : { x: el.offsetLeft, w: el.offsetWidth, pronto: a.w > 0 }))
+  })
+  return (
+    <div className="tabs" role="tablist" aria-label={label} ref={ref}>
+      {abas.map(([chave, texto]) => (
+        <button key={chave} role="tab" aria-selected={ativa === chave} className={`tab-btn ${ativa === chave ? 'is-on' : ''}`} onClick={() => onChange(chave)}>{texto}</button>
+      ))}
+      <span className={`tab-ind ${ind.pronto ? 'is-pronto' : ''}`} style={{ transform: `translateX(${ind.x}px) scaleX(${ind.w})` }} aria-hidden="true" />
+    </div>
   )
 }

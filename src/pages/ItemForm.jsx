@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { Link, useNavigate } from '../components/nav'
 import { ArrowLeft, CircleAlert, ImagePlus, X } from 'lucide-react'
 import { comprimirImagem, useStore } from '../store'
 import { api, useApi } from '../api'

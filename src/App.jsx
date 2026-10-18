@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { StoreProvider } from './store'
+import { RealtimeProvider } from './realtime'
 import Layout, { Privada } from './components/Layout'
 import { Cadastro, Login } from './pages/Auth'
 import Mural from './pages/Mural'
@@ -20,6 +21,7 @@ export default function App() {
   return (
     <StoreProvider>
       <BrowserRouter>
+       <RealtimeProvider>
         <RolarTopo />
         <Routes>
           <Route path="/entrar" element={<Login />} />
@@ -37,6 +39,7 @@ export default function App() {
             <Route path="*" element={<NaoEncontrada />} />
           </Route>
         </Routes>
+       </RealtimeProvider>
       </BrowserRouter>
     </StoreProvider>
   )

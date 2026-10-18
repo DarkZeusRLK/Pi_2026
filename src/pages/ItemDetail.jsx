@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { Link, useNavigate } from '../components/nav'
 import { ArrowLeft, Heart, MessageCircle, Pencil, Phone, Store, Trash2, Users } from 'lucide-react'
 import { tempoRelativo, useStore } from '../store'
 import { api, useApi } from '../api'
+import { useAoReconectar, useCanal, useDebounce } from '../realtime'
 import { PERFIS, STATUS } from '../data/constantes'
 import Avatar from '../components/Avatar'
 import { Badge, Carregando, Confirmar, ErroCarga, Thumb, Vazio } from '../components/ui'
@@ -17,6 +19,12 @@ export default function ItemDetail() {
   const [ocupado, setOcupado] = useState(false)
   const [verInteressados, setVerInteressados] = useState(false)
   const interessados = useApi(verInteressados ? `/itens/${id}/interessados` : null)
+  const [pulsar, setPulsar] = useState(false)
+
+  // mudanças neste item (status, edição, interesse, remoção) aparecem sem F5
+  const atualizarAoVivo = useDebounce(() => { recarregar(true); if (verInteressados) interessados.recarregar(true) }, 250)
+  useCanal('mural', (evento, dados) => { if (dados.id === id) atualizarAoVivo() })
+  useAoReconectar(() => recarregar(true))
 
   if (carregando && !item) return <Carregando texto="Carregando item..." />
   if (erro?.status === 404) {
@@ -39,6 +47,7 @@ export default function ItemDetail() {
     try {
       const novo = await api(`/itens/${id}/interesse`, { method: 'POST' })
       setItem(novo)
+      if (novo.euInteressado) setPulsar(true) // o coração "pulsa" ao marcar
       toast(novo.euInteressado ? 'Interesse registrado! Quem publicou verá seu nome.' : 'Interesse removido.', {
         acao: { texto: 'Desfazer', fn: () => api(`/itens/${id}/interesse`, { method: 'POST' }).then(setItem).catch(toastErro) },
       })
@@ -137,7 +146,7 @@ export default function ItemDetail() {
           {!item.souDono && item.status !== 'Entregue' && (
             <div className="actions-stack">
               <button className={`btn btn-block ${item.euInteressado ? 'btn-outline' : 'btn-primary'}`} onClick={interesse} aria-pressed={item.euInteressado} disabled={ocupado}>
-                <Heart size={18} aria-hidden="true" fill={item.euInteressado ? 'currentColor' : 'none'} />
+                <Heart size={18} aria-hidden="true" fill={item.euInteressado ? 'currentColor' : 'none'} className={pulsar && item.euInteressado ? 'heart-pulsa' : ''} onAnimationEnd={() => setPulsar(false)} />
                 {item.euInteressado ? 'Você tem interesse · remover' : 'Tenho interesse'}
               </button>
               <button className="btn btn-outline btn-block" onClick={conversar}>

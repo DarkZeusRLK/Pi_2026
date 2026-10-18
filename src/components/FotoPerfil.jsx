@@ -38,10 +38,11 @@ export default function FotoPerfil({ aoSalvar, rotuloAdicionar = 'Adicionar foto
     setProgresso(0)
     const ctl = new AbortController()
     cancelar.current = ctl
+    let terminou = false // o SDK pode avisar o progresso depois do fim; sem isso a barra ficaria presa
     try {
       const ext = blob.type === 'image/webp' ? 'webp' : 'jpg'
       const r = await enviarArquivo(`avatares/${user.id}/foto.${ext}`, blob, {
-        carga: { tipo: 'avatar' }, contentType: blob.type, onProgresso: setProgresso, sinal: ctl.signal,
+        carga: { tipo: 'avatar' }, contentType: blob.type, onProgresso: (pct) => { if (!terminou) setProgresso(pct) }, sinal: ctl.signal,
       })
       const { usuario } = await api('/auth/perfil', { method: 'PATCH', body: { avatarUrl: r.url } })
       setUser(usuario)
@@ -52,6 +53,7 @@ export default function FotoPerfil({ aoSalvar, rotuloAdicionar = 'Adicionar foto
       if (e.name === 'AbortError') setPendente(null)
       else setErro(e.message)
     } finally {
+      terminou = true
       setProgresso(null)
       cancelar.current = null
     }

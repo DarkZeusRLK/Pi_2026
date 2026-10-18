@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
+import { Link, useNavigate } from '../components/nav'
 import { Eye, EyeOff, Recycle } from 'lucide-react'
 import { useStore } from '../store'
 import { api } from '../api'

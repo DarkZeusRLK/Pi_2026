@@ -1,7 +1,9 @@
-import { NavLink, Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Link, useNavigate } from './nav'
 import { CircleHelp, House, LayoutDashboard, LogIn, MessageCircle, Plus, Recycle, User } from 'lucide-react'
 import { useStore } from '../store'
 import Avatar from './Avatar'
+import { IndicadorConexao } from '../realtime'
 import { Carregando, Toasts, Vazio } from './ui'
 
 export function Logo() {
@@ -40,6 +42,7 @@ export default function Layout() {
             ))}
           </nav>
           <div className="topbar-actions">
+            <IndicadorConexao />
             <Link to="/ajuda" className="icon-btn" aria-label="Ajuda" title="Ajuda"><CircleHelp size={20} /></Link>
             {user ? (
               <button className="btn btn-primary btn-sm hide-mobile" onClick={() => nav('/novo')}>

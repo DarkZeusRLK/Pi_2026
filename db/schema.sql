@@ -79,3 +79,12 @@ CREATE INDEX IF NOT EXISTS idx_mensagens_conversa ON mensagens (conversa_id, env
 
 -- Etapa 2: foto de perfil (URL do Vercel Blob)
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+
+-- Etapa 3: anexos no chat (texto | imagem | arquivo | audio)
+ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS tipo VARCHAR(10) NOT NULL DEFAULT 'texto';
+ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS anexo_url TEXT;
+ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS anexo_nome VARCHAR(200);
+ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS anexo_mime VARCHAR(100);
+ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS anexo_tamanho INT;
+ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS duracao_seg INT;
+ALTER TABLE mensagens ALTER COLUMN conteudo DROP NOT NULL;

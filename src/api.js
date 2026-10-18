@@ -41,7 +41,8 @@ export function useApi(caminho, { intervalo } = {}) {
       const d = await api(caminho)
       if (atual.current === caminho) { setDados(d); setErro(null) }
     } catch (e) {
-      if (atual.current === caminho && !silencioso) setErro(e)
+      // erro 404 aparece mesmo na atualização silenciosa (ex.: o item foi removido enquanto a pessoa olhava)
+      if (atual.current === caminho && (!silencioso || e.status === 404)) setErro(e)
     } finally {
       if (atual.current === caminho) setCarregando(false)
     }

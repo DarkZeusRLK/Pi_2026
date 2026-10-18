@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import express from 'express'
 import cookieParser from 'cookie-parser'
 import bcrypt from 'bcryptjs'
@@ -6,7 +7,11 @@ import {
   carregarUsuario, emitirSessao, encerrarSessao, exigirAdmin, exigirLogin, usuarioPublico,
 } from './auth.js'
 import { handleUpload } from '@vercel/blob/client'
-import { apagarBlob, blobAtivo, urlDaLoja } from './blob.js'
+import { publicar, publicarVarios, tempoRealAtivo, montarCapability, pedirToken } from './realtime.js'
+import { apagarBlob, blobAtivo, infoDoBlob, urlDaLoja } from './blob.js'
+import {
+  CATEGORIAS_ANEXO, formatarTamanho, limparNomeArquivo, mimeBase, previaDaMensagem,
+} from '../src/utils/anexos.js'
 import { erroTelefone, somenteDigitos } from '../src/utils/telefone.js'
 
 const app = express()
@@ -146,6 +151,14 @@ app.post('/api/uploads', r(async (req, res) => {
         if (info.tipo === 'avatar') {
           if (!pathname.startsWith(`avatares/${u.id}/`) || pathname.includes('..')) throw new Error('Pasta de envio inválida.')
           return { allowedContentTypes: IMAGENS_AVATAR, maximumSizeInBytes: 2 * 1024 * 1024, addRandomSuffix: true, tokenPayload: JSON.stringify({ u: u.id }) }
+        }
+        if (info.tipo === 'chat') {
+          const cat = CATEGORIAS_ANEXO[info.categoria]
+          if (!cat || !UUID.test(String(info.conversaId))) throw new Error('Envio inválido.')
+          const { rowCount } = await query('SELECT 1 FROM conversas WHERE id = $1 AND $2 IN (dono_id, interessado_id)', [info.conversaId, u.id])
+          if (!rowCount) throw new Error('Você não participa desta conversa.')
+          if (!pathname.startsWith(`anexos/${info.conversaId}/`) || pathname.includes('..')) throw new Error('Pasta de envio inválida.')
+          return { allowedContentTypes: cat.mimes, maximumSizeInBytes: cat.max, addRandomSuffix: true, tokenPayload: JSON.stringify({ u: u.id, c: info.conversaId }) }
         }
         throw new Error('Tipo de envio inválido.')
       },
@@ -327,6 +340,7 @@ app.post('/api/itens', exigirLogin, r(async (req, res) => {
     await salvarFotos(client, rows[0].id, d.fotos)
     return rows[0].id
   })
+  await publicar('mural', 'item:criado', { id })
   res.status(201).json(await buscarItem(id, req.usuario))
 }))
 
@@ -351,6 +365,7 @@ app.put('/api/itens/:id', exigirLogin, r(async (req, res) => {
       [d.titulo, d.descricao, d.categoriaId, d.tipo, d.estado, d.tamanho, d.observacoes, d.retiradaSecretaria, req.params.id])
     await salvarFotos(client, req.params.id, d.fotos)
   })
+  await publicar('mural', 'item:atualizado', { id: req.params.id })
   res.json(await buscarItem(req.params.id, req.usuario))
 }))
 
@@ -358,6 +373,7 @@ app.patch('/api/itens/:id/status', exigirLogin, r(async (req, res) => {
   if (!STATUS.includes(req.body.status)) return falha(res, 400, 'Situação inválida.')
   if (!(await exigirGerencia(req, res))) return
   await query('UPDATE itens SET status = $1, atualizado_em = now() WHERE id = $2', [req.body.status, req.params.id])
+  await publicar('mural', 'item:status', { id: req.params.id, status: req.body.status })
   res.json(await buscarItem(req.params.id, req.usuario))
 }))
 
@@ -365,12 +381,14 @@ app.patch('/api/itens/:id/status', exigirLogin, r(async (req, res) => {
 app.delete('/api/itens/:id', exigirLogin, r(async (req, res) => {
   if (!(await exigirGerencia(req, res))) return
   await query('UPDATE itens SET removido_em = now() WHERE id = $1', [req.params.id])
+  await publicar('mural', 'item:removido', { id: req.params.id })
   res.json({ ok: true })
 }))
 
 app.post('/api/itens/:id/restaurar', exigirLogin, r(async (req, res) => {
   if (!(await exigirGerencia(req, res))) return
   await query('UPDATE itens SET removido_em = NULL WHERE id = $1', [req.params.id])
+  await publicar('mural', 'item:restaurado', { id: req.params.id })
   res.json(await buscarItem(req.params.id, req.usuario))
 }))
 
@@ -383,8 +401,12 @@ app.post('/api/itens/:id/interesse', exigirLogin, r(async (req, res) => {
     await query('DELETE FROM interesses WHERE item_id = $1 AND usuario_id = $2', [req.params.id, req.usuario.id])
   } else {
     if (item.status === 'Entregue') return falha(res, 400, 'Este item já foi entregue.')
-    await query('INSERT INTO interesses (item_id, usuario_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [req.params.id, req.usuario.id])
+    const { rowCount } = await query('INSERT INTO interesses (item_id, usuario_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [req.params.id, req.usuario.id])
+    if (rowCount) {
+      await publicar(`usuario:${item.dono.id}`, 'interesse', { itemId: item.id, titulo: item.titulo, nome: req.usuario.nome })
+    }
   }
+  await publicar('mural', 'item:atualizado', { id: req.params.id })
   res.json(await buscarItem(req.params.id, req.usuario))
 }))
 
@@ -408,12 +430,39 @@ app.get('/api/fotos/:id', r(async (req, res) => {
 
 /* ============================== CONVERSAS ============================== */
 
+// Mensagem como o navegador recebe (e como é publicada no canal da conversa: neutra, sem "minha")
+function serializarMensagem(m, usuarioId) {
+  const anexo = m.tipo === 'texto' ? null : {
+    url: m.anexo_url, nome: m.anexo_nome, mime: m.anexo_mime, tamanho: m.anexo_tamanho, duracao: m.duracao_seg,
+  }
+  return {
+    id: m.id,
+    autorId: m.autor_id,
+    minha: usuarioId ? m.autor_id === usuarioId : undefined,
+    tipo: m.tipo,
+    texto: m.conteudo,
+    anexo,
+    em: m.enviada_em,
+    lida: m.lida,
+  }
+}
+
+const CAMPOS_MENSAGEM = 'id, autor_id, tipo, conteudo, anexo_url, anexo_nome, anexo_mime, anexo_tamanho, duracao_seg, enviada_em, lida'
+
+async function totalNaoLidas(usuarioId) {
+  const { rows } = await query(
+    `SELECT count(*)::int AS n FROM mensagens m JOIN conversas c ON c.id = m.conversa_id
+     WHERE $1 IN (c.dono_id, c.interessado_id) AND m.autor_id <> $1 AND NOT m.lida`, [usuarioId])
+  return rows[0].n
+}
+
 app.get('/api/conversas', exigirLogin, r(async (req, res) => {
   const { rows } = await query(`
     SELECT c.id, c.item_id, i.titulo, i.status, i.categoria_id, cat.nome AS categoria,
            (SELECT f.id FROM fotos f WHERE f.item_id = i.id ORDER BY f.ordem LIMIT 1) AS capa_id,
            o.id AS outro_id, o.nome AS outro_nome, o.avatar_url AS outro_avatar,
-           m.conteudo AS ultima, m.autor_id AS ultima_autor, m.enviada_em AS ultima_em,
+           m.tipo AS ultima_tipo, m.conteudo AS ultima, m.anexo_nome AS ultima_anexo_nome, m.duracao_seg AS ultima_duracao,
+           m.autor_id AS ultima_autor, m.enviada_em AS ultima_em,
            (SELECT count(*)::int FROM mensagens x WHERE x.conversa_id = c.id AND x.autor_id <> $1 AND NOT x.lida) AS nao_lidas
     FROM conversas c
     JOIN itens i ON i.id = c.item_id
@@ -426,7 +475,13 @@ app.get('/api/conversas', exigirLogin, r(async (req, res) => {
     id: x.id,
     item: { id: x.item_id, titulo: x.titulo, status: x.status, categoria: x.categoria, capa: x.capa_id ? `/api/fotos/${x.capa_id}` : null },
     outro: { id: x.outro_id, nome: x.outro_nome, avatarUrl: x.outro_avatar || null },
-    ultima: x.ultima ? { texto: x.ultima, minha: x.ultima_autor === req.usuario.id, em: x.ultima_em } : null,
+    ultima: x.ultima_em ? {
+      // "📷 Foto", "📎 nome.pdf", "🎤 Áudio 0:12" ou o próprio texto
+      texto: previaDaMensagem({ tipo: x.ultima_tipo, texto: x.ultima, anexoNome: x.ultima_anexo_nome, duracao: x.ultima_duracao }),
+      tipo: x.ultima_tipo,
+      minha: x.ultima_autor === req.usuario.id,
+      em: x.ultima_em,
+    } : null,
     naoLidas: x.nao_lidas,
   })))
 }))
@@ -451,43 +506,118 @@ async function minhaConversa(req, res) {
   return rows[0]
 }
 
+// Marca como lidas as mensagens recebidas e avisa ao vivo (✓ vira ✓✓ para quem enviou; contador do menu)
+async function marcarLidas(conversa, usuarioId) {
+  const { rowCount } = await query('UPDATE mensagens SET lida = TRUE WHERE conversa_id = $1 AND autor_id <> $2 AND NOT lida', [conversa.id, usuarioId])
+  if (rowCount) {
+    await publicarVarios([
+      [`conversa:${conversa.id}`, 'lidas', { por: usuarioId }],
+      [`usuario:${usuarioId}`, 'nao-lidas', { total: await totalNaoLidas(usuarioId) }],
+    ])
+  }
+  return rowCount
+}
+
 // Retorna a conversa com as mensagens e marca como lidas as recebidas
 app.get('/api/conversas/:id', exigirLogin, r(async (req, res) => {
   const c = await minhaConversa(req, res)
   if (!c) return
-  await query('UPDATE mensagens SET lida = TRUE WHERE conversa_id = $1 AND autor_id <> $2 AND NOT lida', [c.id, req.usuario.id])
+  await marcarLidas(c, req.usuario.id)
   const outroId = c.dono_id === req.usuario.id ? c.interessado_id : c.dono_id
   const [item, outro, msgs] = await Promise.all([
     buscarItem(c.item_id, req.usuario),
     query('SELECT id, nome, perfil, avatar_url AS "avatarUrl" FROM usuarios WHERE id = $1', [outroId]),
-    query('SELECT id, autor_id, conteudo, enviada_em, lida FROM mensagens WHERE conversa_id = $1 ORDER BY enviada_em', [c.id]),
+    query(`SELECT ${CAMPOS_MENSAGEM} FROM mensagens WHERE conversa_id = $1 ORDER BY enviada_em`, [c.id]),
   ])
   res.json({
     id: c.id,
     item,
     outro: outro.rows[0],
-    mensagens: msgs.rows.map((m) => ({ id: m.id, texto: m.conteudo, em: m.enviada_em, lida: m.lida, minha: m.autor_id === req.usuario.id })),
+    mensagens: msgs.rows.map((m) => serializarMensagem(m, req.usuario.id)),
   })
 }))
+
+// O navegador chama quando uma mensagem chega com a conversa aberta (aba visível)
+app.post('/api/conversas/:id/lidas', exigirLogin, r(async (req, res) => {
+  const c = await minhaConversa(req, res)
+  if (!c) return
+  await marcarLidas(c, req.usuario.id)
+  res.json({ ok: true })
+}))
+
+// Confere o anexo de verdade no Blob (tamanho e tipo reais), sem confiar no que o navegador declarou
+async function validarAnexo(body, conversaId) {
+  const a = body.anexo
+  const tipo = body.tipo
+  if (!a || typeof a !== 'object') return { erro: 'Anexo ausente.' }
+  const cat = CATEGORIAS_ANEXO[tipo]
+  if (!cat) return { erro: 'Tipo de mensagem inválido.' }
+  if (!blobAtivo()) return { erro: 'O envio de arquivos está desativado no momento.' }
+  if (!urlDaLoja(a.url, `anexos/${conversaId}/`)) return { erro: 'Arquivo inválido. Envie de novo.' }
+  const real = await infoDoBlob(a.url)
+  if (!real) return { erro: 'Não encontramos o arquivo enviado. Tente enviar de novo.' }
+  const mime = mimeBase(real.contentType)
+  if (!cat.mimes.includes(mime)) return { erro: `Tipo de arquivo não permitido para ${cat.rotulo.toLowerCase()}.` }
+  if (real.size > cat.max) return { erro: `${cat.rotulo} grande demais (máx. ${formatarTamanho(cat.max)}).` }
+  let duracao = null
+  if (tipo === 'audio' && Number.isFinite(Number(a.duracao))) {
+    duracao = Math.max(0, Math.round(Number(a.duracao)))
+    duracao = Math.min(duracao, 6 * 3600)
+  }
+  return { dados: { url: a.url, nome: limparNomeArquivo(a.nome), mime, tamanho: real.size, duracao } }
+}
 
 app.post('/api/conversas/:id/mensagens', exigirLogin, r(async (req, res) => {
   const c = await minhaConversa(req, res)
   if (!c) return
-  const conteudo = texto(req.body.texto, 500)
-  if (!conteudo) return falha(res, 400, 'Escreva uma mensagem.')
+  const tipo = ['texto', 'imagem', 'arquivo', 'audio'].includes(req.body.tipo) ? req.body.tipo : 'texto'
+  let conteudo = texto(req.body.texto, 500)
+  let anexo = null
+  if (tipo === 'texto') {
+    if (!conteudo) return falha(res, 400, 'Escreva uma mensagem.')
+  } else {
+    const v = await validarAnexo({ ...req.body, tipo }, c.id)
+    if (v.erro) return falha(res, 400, v.erro)
+    anexo = v.dados
+    conteudo = conteudo || null
+  }
   const { rows } = await query(
-    'INSERT INTO mensagens (conversa_id, autor_id, conteudo) VALUES ($1,$2,$3) RETURNING id, conteudo, enviada_em, lida',
-    [c.id, req.usuario.id, conteudo])
-  const m = rows[0]
-  res.status(201).json({ id: m.id, texto: m.conteudo, em: m.enviada_em, lida: m.lida, minha: true })
+    `INSERT INTO mensagens (conversa_id, autor_id, tipo, conteudo, anexo_url, anexo_nome, anexo_mime, anexo_tamanho, duracao_seg)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING ${CAMPOS_MENSAGEM}`,
+    [c.id, req.usuario.id, tipo, conteudo, anexo?.url ?? null, anexo?.nome ?? null, anexo?.mime ?? null, anexo?.tamanho ?? null, anexo?.duracao ?? null])
+  const m = serializarMensagem(rows[0], req.usuario.id)
+  const idLocal = typeof req.body.idLocal === 'string' ? req.body.idLocal.slice(0, 64) : undefined
+  const outroId = c.dono_id === req.usuario.id ? c.interessado_id : c.dono_id
+
+  // Tempo real: depois de gravar. O outro participante recebe a mensagem e o novo total de não lidas.
+  const { minha, ...neutra } = m
+  await publicarVarios([
+    [`conversa:${c.id}`, 'mensagem', { ...neutra, idLocal }],
+    [`usuario:${outroId}`, 'nao-lidas', { total: await totalNaoLidas(outroId), conversaId: c.id }],
+  ])
+  res.status(201).json({ ...m, idLocal })
 }))
 
 app.get('/api/notificacoes', r(async (req, res) => {
   if (!req.usuario) return res.json({ naoLidas: 0 })
-  const { rows } = await query(
-    `SELECT count(*)::int AS n FROM mensagens m JOIN conversas c ON c.id = m.conversa_id
-     WHERE $1 IN (c.dono_id, c.interessado_id) AND m.autor_id <> $1 AND NOT m.lida`, [req.usuario.id])
-  res.json({ naoLidas: rows[0].n })
+  res.json({ naoLidas: await totalNaoLidas(req.usuario.id) })
+}))
+
+/* ============================== TEMPO REAL ============================== */
+
+// Token do Ably com permissões mínimas (ver server/realtime.js). Visitante recebe só o mural.
+app.get('/api/realtime/token', r(async (req, res) => {
+  if (!tempoRealAtivo()) return falha(res, 503, 'O tempo real está desativado: falta configurar a ABLY_API_KEY.')
+  const u = req.usuario
+  let conversas = []
+  if (u) {
+    const { rows } = await query(
+      'SELECT id FROM conversas WHERE $1 IN (dono_id, interessado_id) ORDER BY iniciada_em DESC LIMIT 150', [u.id])
+    conversas = rows.map((x) => x.id)
+  }
+  const clientId = u ? u.id : `visitante-${crypto.randomUUID()}`
+  res.set('Cache-Control', 'no-store')
+  res.json(await pedirToken(clientId, montarCapability(u?.id, conversas)))
 }))
 
 /* ============================ PAINEL (ADMIN) ============================ */
